@@ -1,0 +1,182 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/banner-dark-2x.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/banner-light-2x.png">
+    <img src="images/banner-light-2x.png" width="100%" alt="OneOS: another Android, next to One UI. Nothing flashed. Switch from an app, come back the same way. A One UI phone and a OneOS foldable, with arrows going both ways.">
+  </picture>
+</p>
+
+<p align="center">
+  <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-5B3FCB?style=flat-square&labelColor=2B3445">
+  <img alt="Android 17" src="https://img.shields.io/badge/Android-17-1C5FD6?style=flat-square&labelColor=2B3445">
+  <img alt="One UI 9" src="https://img.shields.io/badge/One%20UI-9-1C5FD6?style=flat-square&labelColor=2B3445">
+  <img alt="Root: KernelSU" src="https://img.shields.io/badge/root-KernelSU-1C5FD6?style=flat-square&labelColor=2B3445">
+</p>
+
+OneOS runs a second Android system next to One UI on a rooted Samsung Galaxy
+and switches between the two without flashing anything. One UI stays
+installed; the other system lives in a folder on the phone and starts on One
+UI's kernel as a container with its own zygote and system_server. You switch
+from the OneOS app and come back with **Back to One UI** (the OneOS app inside
+the other system) or by holding **Volume Up + Volume Down** for 3 seconds.
+
+OneOS started from [OneLineage](https://github.com/WeWaffles/OneLineage) by
+WeWaffles, and builds its guest images with
+[MysticGSI](https://github.com/MysticGSI/mysticgsi). See [Credits](#credits).
+
+> [!WARNING]
+> **Experimental. It can break your phone's data.** OneOS replaces core parts
+> of a running system as root. During development a guest system reached One
+> UI's data and deleted app data and photos, and a guest once took over the
+> phone's lock-screen hardware slot so that One UI could not unlock until a
+> factory reset. Both are guarded against now, but untested phones and images
+> can fail in new ways. Back up everything first, remove the screen lock
+> (PIN, pattern, password, fingerprint, face) before switching, and only use a
+> phone you can afford to reset. Nothing here is supported by Samsung, Google
+> or OPPO.
+
+## Status
+
+App version 0.4.1. Snapdragon Samsung flagships only; root is required
+(tested with KernelSU; Magisk and APatch are detected but untested).
+
+| Guest system | Tested on |
+| --- | --- |
+| Pixel 11 Fold (Android 17) | Galaxy Z Fold8 Ultra (SM-F976B), One UI 9 |
+| ColorOS 17, Find N6 build | Galaxy Z Fold8 Ultra (SM-F976B), One UI 9 |
+| ColorOS 17, Find X9 Ultra CN build | Galaxy S25 (SM-S931), Galaxy S25 Ultra (SM-S938), Galaxy S26 Ultra (SM-S948) |
+
+Known open issues for each system are in `docs/pixel-guest.md` and
+`docs/coloros-on-fold.md`.
+
+Everything else (Exynos phones, other models, other images, other Android
+versions) is refused by the app's compatibility checks. **OneOS Probe**, a
+separate read-only app, reports what a phone has and shares a redacted
+findings file, so new phones can be checked without switching anything.
+
+## Getting started
+
+**Before anything else (do not skip these):**
+
+1. **Use a tested phone.** The systems above have only been tested on the
+   phones listed next to them. On any other phone the app warns you, and things
+   may not work.
+2. **Back up your accounts and data.** Samsung Cloud, Google and Smart Switch,
+   plus photos and anything else you can't lose. OneOS guards One UI's data,
+   but it is experimental.
+3. **Remove your screen lock.** Settings › Lock screen › Screen lock type ›
+   **None** or **Swipe**: no PIN, pattern, password, fingerprint or face. If
+   something goes wrong and the phone boot-loops, a locked phone may need a
+   factory reset to recover. OneOS will not switch while a lock is set.
+4. **Root, battery and heat.** The phone must be rooted (tested with KernelSU),
+   charged to at least 30 % and not hot (under 42 °C).
+
+**Then:**
+
+5. Install the OneOS app and allow it in your root manager.
+6. In OneOS open **Systems**, tap **Download** on the system made for your
+   phone and download it, on Wi-Fi (2.5 to 5.3 GB).
+7. Back in OneOS tap **I have the file**, pick the download, then **Set up**.
+   Setup takes about 15 minutes: keep OneOS open and the phone plugged in. One
+   UI keeps working meanwhile.
+8. Tap **Switch**. To come back, tap **Back to One UI** in the other system, or
+   hold **Volume Up + Volume Down** for 3 seconds. Stuck on the logo? Hold
+   **Power + Volume Down** to restart into One UI.
+
+If your root does not survive a restart, activate it again after you come back.
+
+## How it works
+
+1. On a build machine, an OEM firmware image is turned into a system image
+   (with MysticGSI, outside this repository), and `scripts/make-overlays.sh`
+   patches its framework (`switcher/patches/`) so it can run as a guest next to
+   One UI.
+2. The app checks the phone and the image (size and SHA-256 against its own
+   table), then, as root, stages the image and its patched files in
+   `/data/local/tmp/oneos`.
+3. `switcher/assets/oneos_switch.sh` stops One UI's zygote and system_server
+   (the kernel, vendor services and radio keep running) and `guest_prepare.sh`
+   / `guest_start.sh` start the guest's own framework in a mount namespace whose
+   `/system` is the image and whose `/data` is the stage.
+4. Guards keep the guest away from One UI's data and keys: its own vold,
+   storage and installd guards, no weaver or gatekeeper writes, no new users,
+   app ids of its own (`docs/app/patch-catalog.md`).
+5. `return_to_oneui.sh` stops the guest and gives the phone back to One UI, in
+   place when it can and by a reboot otherwise (`docs/inplace-return.md`).
+
+## Repository
+
+| Path | What it is |
+| --- | --- |
+| `app-android/` | The OneOS app and OneOS Probe (Kotlin, One UI look through SESL), the in-guest Back to One UI app, and their tests |
+| `switcher/assets/` | The session scripts the app ships: switch, prepare, start, return, bridges |
+| `switcher/patches/` | Framework patchers (Python and smali) applied by `make-overlays.sh`, and Samsung's installd interface table |
+| `switcher/overlays/`, `switcher/native/` | Runtime resource overlays, and the source of the guest zygote launcher (`zygote_exec`) |
+| `scripts/` | Build-machine tools: the overlay build, adb deploy for development, log collection |
+| `docs/` | Design notes, the patch catalog, and what each test session showed |
+
+## Building from source
+
+```sh
+git clone https://github.com/fahadalijaved23/OneOS.git
+cd OneOS/app-android
+./gradlew assembleProbeDebug     # OneOS Probe: needs nothing outside this repository
+./gradlew test                   # unit tests (dash or busybox for the root script tests)
+```
+
+Requirements: JDK 21, the Android SDK with platform `android-37`
+(`ANDROID_HOME` or `sdk.dir` in `local.properties`), and internet access to
+Google Maven and Maven Central. Details: `app-android/README.md`.
+
+The full OneOS app (`assembleFullDebug`, `assembleFullRelease`) also packs the
+package sets: the files OneOS patches out of each built system image, from
+`../out/overlays*`. They are not in this repository. Building the guest images
+themselves is not part of this repository either (OneOS's images are built with
+MysticGSI, see Credits). What is here is how OneOS patches a built image:
+
+```sh
+APKTOOL=/path/to/apktool.jar EXTRACT_EROFS=/path/to/extract.erofs \
+    scripts/make-overlays.sh <system.img> out/overlays   # the set for that image
+```
+
+The build fails unless every file matches `app-android/packages/<set>.sha256`
+exactly, so the sets must come from the same firmware builds. Release builds
+are signed with a key from `~/.oneos-release/keystore.properties`
+(`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); without it the
+release packaging stops. Debug builds use your machine's debug key.
+
+## Where the images come from
+
+This repository does not host system images, OEM firmware or the patched
+framework files built from them, and GitHub releases never carry them. They
+contain Samsung's, Google's or OPPO's code. The guest images are built from
+the vendor's own firmware outside this repository, and the app accepts only
+the builds whose size and SHA-256 it knows
+(`app-android/core/model/src/main/kotlin/com/fahadali/oneos/core/model/Images.kt`).
+The `firmware/` and `out/` folders are ignored by git for that reason.
+
+## License
+
+OneOS is licensed under the [Apache License 2.0](LICENSE). Parts of this
+repository come from other projects and keep their own terms: the
+OneLineage-derived session scripts (published with WeWaffles' permission). See
+[NOTICE](NOTICE) and [CREDITS.md](CREDITS.md).
+
+## Credits
+
+- **[OneLineage](https://github.com/WeWaffles/OneLineage)** by **WeWaffles**:
+  the container hot-switch OneOS is built on. OneOS's session scripts started
+  from OneLineage's, and WeWaffles gave permission to publish this work on top
+  of it, with credit here and in the app.
+- **[MysticGSI](https://github.com/MysticGSI/mysticgsi)** (The MysticGSI
+  Authors, Apache-2.0): builds the guest images OneOS runs (not part of this
+  repository). MysticGSI includes TrebleDroid work by Pierre-Hugues Husson
+  (phh) and contributors.
+- **[OneUIProject](https://github.com/OneUIProject)**: SESL, oneui-design and
+  oneui-icons (MIT) give the app its One UI look.
+- smali/dexlib2, AndroidX, Kotlin, Guava, ZXing and others: the full list with
+  licenses is in [CREDITS.md](CREDITS.md).
+
+Not affiliated with Samsung, Google, OPPO or OnePlus. Galaxy and One UI are
+trademarks of Samsung Electronics; Android and Pixel of Google LLC; ColorOS of
+OPPO.

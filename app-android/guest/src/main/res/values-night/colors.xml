@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark variants (Theme.DeviceDefault.DayNight); see values/colors.xml. -->
+<resources>
+    <!-- White text on it: 4.7:1. -->
+    <color name="guest_primary">#2F6FE0</color>
+    <!-- Light text on a dark blue pill: 8.2:1. -->
+    <color name="guest_tonal">#2B3E66</color>
+    <color name="guest_on_tonal">#D6E3FF</color>
+</resources>

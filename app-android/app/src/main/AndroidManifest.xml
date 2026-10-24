@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The screens both editions have (OneOS and OneOS Probe). No INTERNET,
+         no storage permission, no permission at all: findings are shared
+         through the share sheet (FileProvider below) or saved where the user
+         picks (ACTION_CREATE_DOCUMENT). The full edition's screens are in
+         src/full/AndroidManifest.xml; the probe edition has none of them. -->
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OneOS">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Shown at launch until acknowledged; MainActivity redirects here. -->
+        <activity
+            android:name=".ui.BeforeYouStartActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.DeviceReportActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.AboutActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Friend build 1: read-only tests as root, then the findings to share. -->
+        <activity
+            android:name=".ui.RunTestsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.FindingsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.RunTestsActivity" />
+
+        <!-- SESL core's androidx FileProvider (stock androidx.core is excluded).
+             Serves only the redacted bundles in the cache (res/xml/findings_paths.xml
+             per edition: cache/findings/, and in the full edition cache/logs/),
+             read-only, through per-share URI grants; not exported. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.findings"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/findings_paths" />
+        </provider>
+    </application>
+
+</manifest>

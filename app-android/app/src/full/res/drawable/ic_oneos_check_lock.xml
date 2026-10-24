@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Check tile icon "Screen lock": an open padlock (Main.dc.html). Line icon;
+     Cards.bindCheckTile tints it with the level colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M7,11h10a2,2 0,0 1,2,2v6a2,2 0,0 1,-2,2h-10a2,2 0,0 1,-2,-2v-6a2,2 0,0 1,2,-2z"
+        android:strokeColor="@color/oneos_ok_text"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:pathData="M8,11V7a4,4 0,0 1,7.5,-2"
+        android:strokeColor="@color/oneos_ok_text"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+</vector>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The gap splash (GapSplashActivity, Splash.dc.html). %1$s is the system's
+     name from the image table (Images.systemName), never fixed text. -->
+<resources>
+    <string name="splash_starting">Starting %1$s</string>
+    <!-- A test run stops One UI too, sets the system up, checks it and restarts into One UI. -->
+    <string name="splash_test_run">Test run: checking %1$s</string>
+</resources>

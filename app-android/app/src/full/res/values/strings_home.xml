@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home, the Switch sheet and Welcome back (the redesign: Main, HomeInner,
+         SwitchSheet and WelcomeBack in oneos-notes/2026-10-24/design-canvas).
+         Fixed text never names a system: %1$s is the image table's name
+         (StringsNeutralTest reads this file). -->
+
+    <!-- Hero -->
+    <string name="home_overline">OneOS</string>
+    <string name="home_line_ready">Ready to switch · Android %1$s</string>
+    <string name="home_line_kept">Your apps and data in it are kept</string>
+    <string name="home_line_setup_time">Setup takes about 15 minutes</string>
+    <string name="home_line_picked">Downloaded · ready to set up</string>
+    <string name="home_line_setting_up">Setting up · %1$d%%</string>
+    <string name="home_line_setting_up_start">Setting up…</string>
+    <string name="home_line_switching">Getting ready to switch…</string>
+    <string name="home_line_moment">This takes a moment…</string>
+
+    <!-- Under the main button -->
+    <string name="home_caption_switch">About a minute · nothing is erased</string>
+    <string name="home_caption_setup">About 15 minutes · One UI keeps working</string>
+
+    <!-- The check tiles -->
+    <string name="home_checks_ready">Your phone is ready</string>
+    <string name="home_checks_fix">Before you switch</string>
+    <string name="home_checks_count">%1$d of %2$d checks</string>
+    <string name="home_checks_checking">Checking…</string>
+    <string name="home_tile_root">Root</string>
+    <string name="home_tile_space">Space</string>
+    <string name="home_tile_battery">Battery</string>
+    <string name="home_tile_lock">Screen lock</string>
+    <string name="home_value_root_app">%1$s allowed</string>
+    <string name="home_value_root_ok">Allowed</string>
+    <string name="home_value_root_denied">Not allowed</string>
+    <string name="home_value_root_missing">Not found</string>
+    <string name="home_value_space_free">%1$s free</string>
+    <string name="home_value_space_short">Free up %1$s</string>
+    <string name="home_value_space_setup">%1$s free · setup needs %2$s</string>
+    <string name="home_value_battery">%1$d%% · %2$d °C</string>
+    <string name="home_value_battery_no_temp">%1$d%%</string>
+    <string name="home_value_lock_off">Off</string>
+    <string name="home_value_lock_on">On</string>
+    <string name="home_value_unknown">Not read</string>
+
+    <!-- Rows -->
+    <string name="home_row_last">Last time</string>
+    <string name="home_row_last_time">%1$s in %2$s</string>
+    <string name="home_row_last_reading">Reading how it went…</string>
+    <string name="home_row_last_unread">%1$s · tap to see how it went</string>
+    <string name="home_row_systems">Systems</string>
+    <string name="home_row_systems_summary">Set up another one, or use a downloaded file</string>
+    <string name="home_row_advanced_summary">Repair, free up space, last session and help</string>
+    <string name="home_row_session">Last session</string>
+    <string name="home_row_session_summary">What happened, and the logs to share</string>
+
+    <!-- Setting up -->
+    <string name="home_progress_label">Setup progress</string>
+
+    <!-- Welcome back -->
+    <string name="home_welcome_good">One UI is as you left it</string>
+    <string name="home_welcome_card">Your time in %1$s</string>
+    <string name="home_welcome_card_test">Your test run</string>
+    <string name="home_welcome_in">in %1$s</string>
+    <string name="home_welcome_how">how you came back</string>
+    <string name="home_welcome_logs">Logs collected. Numbers, Wi-Fi names and accounts were removed.</string>
+    <string name="home_how_keys">Volume keys</string>
+    <string name="home_how_app">Back to One UI</string>
+    <string name="home_how_auto">OneOS brought you back</string>
+    <string name="home_how_restart">Force restart</string>
+    <string name="home_how_off">Phone turned off</string>
+    <string name="home_how_none">Never left One UI</string>
+    <string name="home_how_test">Test run</string>
+    <string name="home_how_other">Not known</string>
+    <string name="home_switch_again">Switch again</string>
+    <string name="home_done">Done</string>
+
+    <!-- The Switch sheet (SwitchConfirm): the ways back stay listed, the boxes stay required. -->
+    <string name="home_sheet_ways_three">Three ways back to One UI</string>
+    <string name="home_sheet_ways_two">Two ways back to One UI</string>
+    <string name="home_sheet_back_app">Tap Back to One UI</string>
+    <string name="home_sheet_back_app_line">In the OneOS app inside %1$s, or its Quick Settings tile</string>
+    <string name="home_sheet_back_keys">Hold Volume Up + Volume Down</string>
+    <string name="home_sheet_back_keys_line">Both together for 3 seconds</string>
+    <string name="home_sheet_back_stuck">Stuck on the logo?</string>
+    <string name="home_sheet_back_stuck_line">Hold Power + Volume Down to restart into One UI</string>
+</resources>

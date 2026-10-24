@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- OneOS blue; OneOS Probe's icon is green (src/probe). -->
+    <color name="ic_launcher_background">#1C5FD6</color>
+
+    <!-- Redesign tokens (docs/app/redesign-2.md). Full edition only: OneOS
+         Probe keeps the stock One UI look. Dark values in values-night. -->
+
+    <!-- Brand, the same in both modes: the launcher mark and the hero picture. -->
+    <color name="oneos_blue">#1C5FD6</color>
+    <!-- Only for the guest side of the hero picture. -->
+    <color name="oneos_purple">#5B3FCB</color>
+    <!-- "OS" of the splash wordmark on black. -->
+    <color name="oneos_blue_on_black">#8FB4FF</color>
+
+    <!-- colorPrimary: filled buttons under white text (5.7:1). -->
+    <color name="oneos_primary">#1C5FD6</color>
+    <!-- colorPrimaryDark / colorControlActivated: blue text, links, switches
+         (5.3:1 or more on the window, cards and tiles). -->
+    <color name="oneos_primary_text">#1C5FD6</color>
+    <!-- The hero's arrow from the guest side back to One UI. -->
+    <color name="oneos_purple_text">#5B3FCB</color>
+
+    <!-- Secondary text, 5.9:1 or more on window, card and tile (SESL's #8C8C8C is 3.3:1). -->
+    <color name="oneos_text_secondary">#5E5E5E</color>
+    <!-- Line icons in rows. -->
+    <color name="oneos_icon">#3D3D3D</color>
+
+    <!-- Check tiles (16dp) on a card, plus the warn/block tints. -->
+    <color name="oneos_tile_bg">#F2F5FB</color>
+    <color name="oneos_tile_bg_warn">#FDF0E8</color>
+    <color name="oneos_tile_bg_block">#FCECEB</color>
+
+    <!-- Status fills (badges): the One UI functional colours. -->
+    <color name="oneos_ok">@color/oui_functional_green_color</color>
+    <color name="oneos_warn">@color/oui_functional_orange_color</color>
+    <color name="oneos_block">@color/oui_functional_red_color</color>
+    <color name="oneos_info">#5E5E5E</color>
+    <!-- The glyph drawn on a status fill. -->
+    <color name="oneos_on_status">#FFFFFF</color>
+
+    <!-- Status text and icons on cards and tiles, 4.6:1 or more (the light
+         functional green and orange are about 3:1). -->
+    <color name="oneos_ok_text">#0E7F4D</color>
+    <color name="oneos_warn_text">#B4460F</color>
+    <color name="oneos_block_text">#C42B22</color>
+
+    <!-- Buttons. -->
+    <color name="oneos_button_secondary_bg">#EBEBEB</color>
+    <color name="oneos_ripple_on_primary">#33FFFFFF</color>
+</resources>

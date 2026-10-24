@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Advanced and the screens it opens (the redesign's card look). Every
+         row is named like the screen it opens. Plain words, short summaries;
+         the technical words stay under Details and For the OneOS team. Fixed
+         text never names a system: %1$s is ImageRef.name at runtime
+         (StringsNeutralTest reads every string here). -->
+
+    <!-- Shared -->
+    <string name="advanced_details">Details</string>
+
+    <!-- Advanced -->
+    <string name="advanced_title">Advanced</string>
+    <string name="advanced_card_system">Setup and space</string>
+    <string name="advanced_setup_summary">Set it up again, keeping its apps and data or starting fresh</string>
+    <string name="advanced_file_summary">Pick the file you downloaded and check it</string>
+    <string name="advanced_space_summary">Old copies of systems you set up before</string>
+    <string name="advanced_space_free">%1$s free</string>
+    <string name="advanced_space_none">%1$s free · no old copies</string>
+    <string name="advanced_space_old">%1$s free · deleting %2$s frees %3$s</string>
+    <string name="advanced_space_count">%1$s free · %2$s you can delete</string>
+    <plurals name="advanced_space_copies">
+        <item quantity="one">%d old copy</item>
+        <item quantity="other">%d old copies</item>
+    </plurals>
+    <string name="advanced_card_sessions">Sessions</string>
+    <string name="advanced_last_none">No session yet</string>
+    <string name="advanced_last_outcome">%1$s · %2$s</string>
+    <string name="advanced_last_test">%1$s · test run</string>
+    <string name="advanced_logs_summary">Share them with the OneOS team. Personal info is removed first.</string>
+    <string name="advanced_restore_summary">Only needed after a force restart during a session</string>
+    <string name="advanced_card_help">Help</string>
+    <string name="advanced_before_summary">What can break, backups and the screen lock</string>
+    <string name="advanced_about_summary">Version, safety and credits</string>
+    <string name="advanced_team_summary">Technical screens, for when the OneOS team asks</string>
+
+    <!-- For the OneOS team -->
+    <string name="team_title">For the OneOS team</string>
+    <string name="team_note">Technical screens. Open them when the OneOS team asks you to.</string>
+    <string name="team_card_checks">Checks and tests</string>
+    <string name="team_switch_summary">Every check in detail, then a test run or the switch</string>
+    <string name="team_phone_summary">Model, chip, software and root</string>
+    <string name="team_tests_summary">Read-only. Helps the OneOS team add support for your phone.</string>
+    <!-- Run tests' screen, in this edition: "Phone tests", so it is not read as the Test run (the probe keeps "Run tests"). -->
+    <string name="tests_title">Phone tests</string>
+    <string name="team_card_setup">Setup and files</string>
+    <string name="team_setup_summary">The setup page with every check, the folder and each step</string>
+    <string name="team_file_summary">File names and sizes, the file check, and the system on this phone</string>
+
+    <!-- Free up space (OldStagesActivity) -->
+    <string name="space_title">Free up space</string>
+    <string name="space_card_storage">Storage</string>
+    <string name="space_free_line">%1$s free of %2$s</string>
+    <string name="space_bar_desc">Storage %1$d%% used</string>
+    <string name="space_system_label">%1$s set up now</string>
+    <string name="space_old_label">old copies</string>
+    <string name="space_value_unknown">Not read</string>
+    <string name="space_value_none">None</string>
+    <string name="space_frees">Deleting all old copies frees %1$s.</string>
+    <string name="space_card_old">Old copies</string>
+    <string name="space_old_line">When setup starts a system fresh, it keeps the one before as an old copy. Delete one to free its space.</string>
+    <string name="space_listing">Looking for old copies…</string>
+    <string name="space_not_read">Couldn\'t read the old copies</string>
+    <string name="space_not_read_line">Try Check again. The reason is under Details.</string>
+    <string name="space_none">No old copies</string>
+    <string name="space_none_summary">Nothing to delete. One UI and the system set up now are never deleted here.</string>
+    <string name="space_old_of">Old copy of %1$s</string>
+    <string name="space_old_unknown">Old copy</string>
+    <string name="space_old_trash">Leftovers of an unfinished delete</string>
+    <string name="space_old_kept_since">kept since %1$s</string>
+    <string name="space_old_stopped_since">left on %1$s</string>
+    <string name="space_old_has_data">with its apps and data</string>
+    <string name="space_old_in_use">in use: restart the phone first</string>
+    <string name="space_deleting">Deleting…</string>
+    <string name="space_deleted">Deleted · %1$s freed</string>
+    <string name="space_not_deleted">Not deleted</string>
+    <string name="space_not_deleted_line">It may still be in use. Restart the phone, then try again.</string>
+    <string name="space_check_again">Check again</string>
+    <string name="space_delete_title">Delete this old copy?</string>
+    <string name="space_delete_what_of">the old copy of %1$s</string>
+    <string name="space_delete_what">this old copy</string>
+    <string name="space_delete_message">This deletes %1$s with its apps, accounts and settings (%2$s). You can\'t undo it. One UI and the system set up now aren\'t touched.</string>
+    <string name="space_delete_run">Delete</string>
+    <string name="space_details_summary">Folder names, and what OneOS checks first</string>
+    <string name="space_details_rules">Root deletes only an old copy OneOS kept (a folder named oneos.old-&lt;time&gt;), and not while it\'s in use: something is still open in it, a session since the last restart used it, or it\'s still linked to One UI\'s folders. A restart ends that.</string>
+    <string name="space_details_folder">%1$s · image %2$s</string>
+
+    <!-- Last session -->
+    <string name="last_none">No session yet</string>
+    <string name="last_none_line">When you switch, how it went shows here.</string>
+    <string name="last_dry">Test run</string>
+    <string name="last_time_in">Your time in %1$s</string>
+    <string name="last_switched_to">Switched to %1$s</string>
+    <string name="last_test_line">It was a test: %1$s was set up and checked but not started.</string>
+    <string name="last_rebooted_summary">The session has ended. Collect the logs below to see how it went; your next switch replaces them.</string>
+    <string name="last_not_rebooted_summary">The phone hasn\'t restarted since. If the switch didn\'t start, the logs say why.</string>
+    <string name="last_collect_title">Collect the logs</string>
+    <string name="last_collect_again">Collect them again</string>
+    <string name="last_collect_summary">Takes a minute or two. Nothing on the phone changes.</string>
+    <string name="last_collecting">Collecting the logs…</string>
+    <string name="last_collecting_summary">Personal info is removed as they\'re read.</string>
+    <string name="last_collect_failed">Couldn\'t collect the logs</string>
+    <string name="last_collect_failed_line">Try again; if your root app asks, allow OneOS. The reason is under Details.</string>
+    <string name="last_collected">Logs collected</string>
+    <string name="last_collected_summary">Numbers, Wi-Fi names and accounts were removed.</string>
+    <string name="last_view_summary">Look at them, or send them to the OneOS team</string>
+    <string name="last_privacy_summary">The switch and return logs, the other system\'s start-up logs and text reports on the phone\'s state. Lines about messages, contacts, Wi-Fi and places are dropped; numbers, IDs, emails, Wi-Fi names, accounts and file names are removed as they\'re read. Never screenshots or recordings.</string>
+    <string name="last_collect_dialog_message">OneOS only reads. Saved Wi-Fi names are read only to remove them from the logs; they\'re never saved or shared. Personal info is removed before anything is written.</string>
+    <string name="last_collect_run">Collect</string>
+    <string name="last_restore_summary">The last session didn\'t return normally. This puts back the settings One UI had before it.</string>
+    <string name="last_restore_maybe">Only needed after a force restart during the session. If it returned normally, nothing changes.</string>
+    <string name="last_restore_dialog_message">OneOS puts back the settings One UI had when the session started, such as its language, from the copy it saved then. Only that session\'s own copy is used.</string>
+    <string name="last_restored">One UI\'s settings are back</string>
+    <string name="last_restore_failed">Couldn\'t restore One UI\'s settings</string>
+    <string name="last_restore_failed_line">Try again, or send the logs to the OneOS team. The reason is under Details.</string>
+    <string name="last_forget_summary">Clears this summary here and on Home until your next switch. The logs stay on the phone.</string>
+    <string name="last_details_summary">Session ID, how it ended in detail, what the logs said</string>
+    <string name="last_details_image">Image %1$s</string>
+
+    <!-- Use a downloaded file (ImageActivity); "File details and checks" from the OneOS team's entry -->
+    <string name="image_title">Use a downloaded file</string>
+    <string name="image_title_team">File details and checks</string>
+    <string name="image_no_profile_title">No system for this phone yet</string>
+    <string name="image_no_profile_summary">This version of OneOS has none for this phone. Phone details, in Advanced › For the OneOS team, shows why.</string>
+    <string name="image_cat_file">Your file</string>
+    <string name="image_pick_summary">Opens your files. OneOS reads only the file you pick.</string>
+    <string name="image_not_used">%1$s · not used: setup reuses the system already on this phone</string>
+    <string name="image_file_ok">It\'s %1$s for this phone</string>
+    <string name="image_check_title">Check the file</string>
+    <string name="image_check_summary">Reads the whole file to make sure it isn\'t damaged. Takes a minute or two.</string>
+    <string name="image_checking">Checking the file… %1$d%%</string>
+    <string name="image_checking_bytes">%1$s of %2$s</string>
+    <string name="image_use_gz_title">Use this file instead</string>
+    <string name="image_use_gz_summary">Setup then uses this file, not the system already on this phone</string>
+    <string name="image_forget_summary">OneOS stops using it. The file stays in your files.</string>
+    <string name="image_cat_on_phone">Already on this phone</string>
+    <string name="image_look_summary">If a system is already on this phone, setup can reuse it and skip the download. Nothing on the phone changes.</string>
+    <string name="image_look_failed">That didn\'t finish. Try again; the reason is under Details.</string>
+    <string name="image_look_dialog_title">Look as root?</string>
+    <string name="image_look_dialog_message">OneOS only reads what\'s in its folder. Nothing on the phone changes.</string>
+    <string name="image_look_run">Look</string>
+    <string name="image_on_phone_ok">%1$s is on this phone</string>
+    <string name="image_on_phone_none">No system on this phone yet</string>
+    <string name="image_use_on_phone_title">Reuse it</string>
+    <string name="image_use_on_phone_summary">Skips the download. Setup keeps its apps and data.</string>
+    <string name="image_on_phone_chosen">Setup reuses it</string>
+    <string name="image_on_phone_replaced">Setup replaces it with the file you pick.</string>
+    <string name="image_on_phone_aside">It can\'t be reused</string>
+    <string name="image_on_phone_aside_summary">Its apps and data are from another system or an older version, so setup keeps them as an old copy and needs the download. Pick the file above.</string>
+    <string name="image_takes_title">Systems for your %1$s</string>
+    <string name="image_takes_summary">Get one from Choose a system (Download), then pick the file above.</string>
+    <string name="image_choice_sizes">%1$s download · %2$s once set up</string>
+    <string name="image_details_summary">File names, sizes and what the checks found</string>
+    <string name="image_details_file">%1$s\n%2$s, unpacks to %3$s. %4$s.</string>
+    <string name="image_details_check">Check the file compares the whole file\'s SHA-256 with the one built into OneOS. Look for a system on this phone reads OneOS\'s folder as root, read-only.</string>
+    <string name="image_details_sha">SHA-256 of the picked file</string>
+    <string name="image_details_look">The last look said</string>
+
+    <!-- Repair or start fresh (PrepareActivity); "Setup details" from the OneOS team's entry -->
+    <string name="prepare_title">Repair or start fresh</string>
+    <string name="prepare_title_team">Setup details</string>
+    <string name="prepare_intro">Sets the system up again in OneOS\'s own folder. It takes about 15 minutes; One UI keeps working meanwhile.</string>
+    <string name="prepare_intro_safe">Nothing outside that folder changes. What\'s set up now is kept, or kept as an old copy: never deleted.</string>
+    <string name="prepare_check_summary">Root, free space, the screen lock and what\'s set up now. Nothing on the phone changes.</string>
+    <string name="prepare_check_failed">The check didn\'t finish. Try again; the reason is under Details.</string>
+    <string name="prepare_checks_ok">Everything is in place</string>
+    <string name="prepare_check_dialog_message">OneOS only reads; nothing on the phone changes.\n\nIf your root app doesn\'t ask, allow OneOS in it first.</string>
+    <string name="prepare_check_run">Check</string>
+    <string name="prepare_need_full">Tap Check again before setting up</string>
+    <string name="prepare_on_phone_needs_keep">To reuse the system on this phone, choose Keep its apps and data</string>
+    <string name="prepare_cat_stage">What\'s set up now</string>
+    <string name="prepare_stage_none">Nothing set up yet</string>
+    <string name="prepare_stage_empty">OneOS\'s folder is empty</string>
+    <string name="prepare_stage_ours">%1$s is set up</string>
+    <string name="prepare_stage_partial">A setup that didn\'t finish</string>
+    <string name="prepare_stage_foreign">Files OneOS didn\'t put there</string>
+    <string name="prepare_stage_odd">Something else is where OneOS\'s folder goes</string>
+    <string name="prepare_stage_not_folder">It has to be removed first. Ask the OneOS team how.</string>
+    <string name="prepare_mode_new">Start fresh</string>
+    <string name="prepare_mode_new_summary">%1$s starts with new apps and data.</string>
+    <string name="prepare_mode_keep_summary">Repairs the system and keeps its apps, accounts and settings.</string>
+    <string name="prepare_mode_aside">Keep it as an old copy, start fresh</string>
+    <string name="prepare_mode_aside_summary">Nothing is deleted. %1$s starts with new apps and data; delete the old copy later in Free up space.</string>
+    <string name="prepare_mode_aside_other_image">Its apps and data are from %1$s and could break in another system, so they\'re kept as an old copy. %2$s starts fresh.</string>
+    <string name="prepare_mode_aside_other_system">It holds another system\'s apps and data, which %1$s can\'t use. They\'re kept as an old copy and %1$s starts fresh.</string>
+    <string name="prepare_mode_aside_older">It holds an older system\'s apps and data, which %1$s can\'t use. They\'re kept as an old copy and %1$s starts fresh.</string>
+    <string name="prepare_cat_run">Start</string>
+    <string name="prepare_run_title">Start setup</string>
+    <string name="prepare_run_summary">Needs about %1$s free. You confirm first.</string>
+    <string name="prepare_needs_unknown">about 22 GB</string>
+    <string name="prepare_running">Setting up… keep OneOS open</string>
+    <string name="prepare_running_title">Setting up · %1$d%%</string>
+    <string name="prepare_stop_summary">Stops after the current file. The system is then not set up, and the switch stays off until you set it up again.</string>
+    <string name="prepare_done">Finished</string>
+    <string name="prepare_not_done">Didn\'t finish</string>
+    <string name="prepare_moved_title">Kept as old copies</string>
+    <string name="prepare_delete_gz_summary">%1$s isn\'t needed now. If you set up again later, you\'ll need to download it once more.</string>
+    <string name="prepare_delete_gz_message">Delete %1$s? The system set up from it stays.</string>
+    <string name="prepare_dialog_title">Start setup?</string>
+    <string name="prepare_dialog_message">It takes about 15 minutes; keep OneOS open and the phone plugged in. OneOS writes only in its own folder and checks every file before it\'s used.</string>
+    <string name="prepare_dialog_gz">Uses the file you downloaded for %1$s.</string>
+    <string name="prepare_dialog_on_phone">Reuses %1$s already on this phone; it\'s checked first (about a minute).</string>
+    <string name="prepare_dialog_team">As root, through its root script, in /data/local/tmp/oneos only: the system image, the OneOS files, the installd table and the session settings. Root checks each file\'s size and SHA-256 before it is used. A folder OneOS 0.3.6 or earlier made under its old name is renamed first; nothing in it changes.</string>
+    <string name="prepare_details_summary">Every check, the folder as root read it, each step</string>
+    <string name="prepare_what_summary">As root, OneOS unpacks the image into /data/local/tmp/oneos (5 to 11 GB) and puts the OneOS files and session scripts next to it, checking each one\'s SHA-256. It takes about 15 minutes.</string>
+    <string name="prepare_safe_summary">Setup writes only in OneOS\'s folder and deletes nothing outside it. What was set up before is kept as an old copy, and leftover files are moved to a folder inside OneOS\'s folder. One UI keeps running.</string>
+
+    <!-- All checks and Test run (SwitchActivity, For the OneOS team and Home's Details) -->
+    <string name="switch_title">All checks and Test run</string>
+    <string name="switch_cat_back">Ways back to One UI</string>
+    <string name="switch_back_keys_title">Hold Volume Up + Volume Down for 3 seconds</string>
+    <string name="switch_back_keys_summary">Works once %1$s is starting: the phone restarts into One UI. While the OneOS logo still shows, use Force restart.</string>
+    <string name="switch_back_auto_title">OneOS brings you back by itself</string>
+    <string name="switch_back_auto_summary">If %1$s doesn\'t finish starting, stops, or the screen stays black, the phone restarts into One UI after a few minutes.</string>
+    <string name="switch_back_force_summary">Hold Power + Volume Down until it restarts into One UI. Afterwards, tap Restore One UI\'s settings in Advanced.</string>
+    <string name="switch_back_root_summary">If root needs turning on again after a restart, do that, then open OneOS. Last session shows how it went.</string>
+    <string name="switch_check_summary">Every check again: root, the set-up system, the screen lock, battery and free space. Nothing on the phone changes.</string>
+    <string name="switch_need_full">Tap Check again first</string>
+    <string name="switch_cat_go">Test run and switch</string>
+    <string name="switch_dry_title">Test run</string>
+    <string name="switch_dry_summary">One UI closes while %1$s is set up and checked, then the phone restarts into One UI. %1$s doesn\'t start.</string>
+    <string name="switch_go_summary">Every check runs again, then One UI closes and %1$s starts</string>
+    <string name="switch_hide_gms_title">Hide Google apps this time</string>
+    <string name="switch_hide_gms_summary">Leaves Play services and the Play Store out of %1$s this time only. Nothing else changes.</string>
+    <string name="switch_dialog_gms_hidden">Google apps are hidden this time.</string>
+    <string name="switch_dry_dialog_title">Test run?</string>
+    <string name="switch_go_dialog_message">One UI closes and %1$s starts in about a minute. %2$s\n\nApps you install in %1$s can reach One UI\'s data if they get root: install only ones you trust.\n\nOneOS closes with One UI.</string>
+    <string name="switch_go_dialog_back_keys">To come back, hold Volume Up + Volume Down for 3 seconds once it\'s starting. Stuck on the OneOS logo? Hold Power + Volume Down.</string>
+    <string name="switch_go_dialog_back_app">To come back, tap Back to One UI in %1$s, or hold Volume Up + Volume Down for 3 seconds. Stuck on the OneOS logo? Hold Power + Volume Down.</string>
+
+    <!-- Before you start (read again from Advanced › Help) -->
+    <string name="before_experimental_summary">It switches the phone into another system without flashing. Things can break.</string>
+    <string name="before_lock_summary">Remove your PIN, pattern, password, fingerprint and face unlock before switching. If the phone gets stuck restarting, a locked phone may not let you recover it.</string>
+    <string name="before_apps_summary">Apps in the other system can get the same root as One UI. One that does could reach One UI\'s data: install only apps you trust, and never grant root to ones you don\'t know.</string>
+
+    <!-- About OneOS and Phone details (main's texts, in plain words and naming no system, for this edition) -->
+    <string name="tested_scope">Tested only on the Z Fold (F8U).</string>
+    <string name="about_what_summary">Runs another Android system next to One UI on a rooted phone, and comes back to One UI with a restart. Nothing is flashed.</string>
+    <string name="about_version_scope_summary">Sets up a system you downloaded in its own folder and switches to it. Back to One UI or Volume Up + Down brings you back. OneOS downloads nothing itself and deletes nothing outside its folder without asking.</string>
+    <string name="about_tested_summary">Tested only on the Z Fold (F8U). The other phones OneOS lists are untested.</string>
+    <string name="about_safety_summary">Every change OneOS makes as root is checked first, by the app and by root. Nothing outside OneOS\'s folder is ever deleted, and the other system is kept away from One UI\'s data.</string>
+    <string name="report_title">Phone details</string>
+    <string name="report_warning_next">Setup and the switch run their own checks and stop anything this phone can\'t run.</string>
+
+    <!-- Session logs and the credits (main's texts, in plain words, for this edition) -->
+    <string name="logs_delete_summary">Removes these logs from OneOS. The phone keeps its own copy in OneOS\'s folder until your next switch.</string>
+    <string name="about_credit_oneos_summary">The app and the changes OneOS makes to each system. Its session scripts started from OneLineage\'s (below).</string>
+</resources>

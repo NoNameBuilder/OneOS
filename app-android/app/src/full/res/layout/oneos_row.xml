@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tappable row in a list card (Main.dc.html "Last time", "Systems",
+     "Advanced"): line icon, title, optional summary, optional end view. The
+     whole row is the tap target (56dp or more). Bound by Cards.bindRow. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/OneOS.Row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:id="@+id/oneos_row_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="@dimen/oneos_row_icon_gap"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        app:tint="@color/oneos_icon" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/oneos_row_title"
+            style="@style/OneOS.Text.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:id="@+id/oneos_row_summary"
+            style="@style/OneOS.Text.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- Optional: a status badge (Cards.badge) or a chevron. -->
+    <ImageView
+        android:id="@+id/oneos_row_end"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="@dimen/oneos_row_icon_gap"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
+</LinearLayout>

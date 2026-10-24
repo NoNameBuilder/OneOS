@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS inside the guest (GuestReturn.dc.html). Fixed text names no guest
+     system: %1$s in title_in is the guest image's own name (GuestName). -->
+<resources>
+    <string name="app_name">OneOS</string>
+
+    <string name="title_in">You\'re in %1$s</string>
+    <!-- No friendly name in the guest's own build.prop files. -->
+    <string name="title_in_other">You\'re in the other system</string>
+    <string name="body">through OneOS. One UI is waiting for you, unchanged.</string>
+
+    <string name="back">Back to One UI</string>
+    <!-- True for the reboot return (ONEOS_RETURN_MODE=reboot, the only mode the session takes today). -->
+    <string name="back_caption">The phone restarts into One UI, in about a minute. Apps open here close, so save your work first.</string>
+
+    <string name="confirm_title">Back to One UI</string>
+    <string name="confirm_message">Return to One UI now? Unsaved work in apps will be lost.</string>
+    <string name="confirm_return">Return</string>
+
+    <string name="status_returning">Returning to One UI…</string>
+    <string name="status_no_answer">OneOS has not answered yet. If nothing happens within a minute, hold Volume Up and Volume Down together for 3 seconds.</string>
+    <string name="status_failed">Could not ask OneOS to return (%1$s). Hold Volume Up and Volume Down together for 3 seconds.</string>
+
+    <string name="ways_title">Other ways back</string>
+    <string name="way_tile_title">Quick Settings tile</string>
+    <string name="way_tile_summary">Back to One UI from anywhere</string>
+    <string name="add_tile">Add</string>
+    <string name="add_tile_description">Add the Back to One UI tile to Quick Settings</string>
+    <string name="tile_added">Added</string>
+    <string name="tile_added_description">The Back to One UI tile is in Quick Settings</string>
+    <string name="way_keys_title">Volume Up + Volume Down</string>
+    <string name="way_keys_summary">Hold both for 3 seconds</string>
+
+    <string name="tile_label">Back to One UI</string>
+    <string name="tile_subtitle">OneOS</string>
+</resources>

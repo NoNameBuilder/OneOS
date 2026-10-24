@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Welcome back, a good return (WelcomeBack.dc.html): a tick on a green disc
+     in a light ring. Decorative (the headline says it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path
+        android:fillColor="@color/home_ring_ok"
+        android:pathData="M48,2a46,46 0,1 1,0 92a46,46 0,1 1,0 -92z" />
+    <path
+        android:fillColor="@color/oneos_ok"
+        android:pathData="M48,16a32,32 0,1 1,0 64a32,32 0,1 1,0 -64z" />
+    <path
+        android:pathData="M34,49l9,9l19,-19"
+        android:strokeColor="@color/oneos_on_status"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="6" />
+</vector>

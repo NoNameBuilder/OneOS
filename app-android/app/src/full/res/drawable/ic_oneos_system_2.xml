@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- System card glyph 3 of 3: an open foldable on a 16dp tile, two-lens
+     camera. No brand mark. Decorative. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+    <path
+        android:fillColor="@color/oneos_sys2_tile"
+        android:pathData="M16,0h24a16,16 0,0 1,16,16v24a16,16 0,0 1,-16,16h-24a16,16 0,0 1,-16,-16v-24a16,16 0,0 1,16,-16z" />
+    <path
+        android:fillColor="@color/oneos_sys2_fill"
+        android:pathData="M17,13h22a6,6 0,0 1,6,6v18a6,6 0,0 1,-6,6h-22a6,6 0,0 1,-6,-6v-18a6,6 0,0 1,6,-6z" />
+    <path
+        android:pathData="M28,13L28,43"
+        android:strokeAlpha="0.6"
+        android:strokeColor="@color/oneos_sys2_tile"
+        android:strokeWidth="1.5" />
+    <path
+        android:fillAlpha="0.9"
+        android:fillColor="@color/oneos_sys2_tile"
+        android:pathData="M16.5,22a2.5,2.5 0,1 1,5,0a2.5,2.5 0,1 1,-5,0z M16.5,29a2.5,2.5 0,1 1,5,0a2.5,2.5 0,1 1,-5,0z" />
+</vector>

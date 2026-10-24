@@ -1,0 +1,3 @@
+# framework overlays built by scripts/make-overlays.sh with the storage, installd, power, sysrq and weaver guards
+a5d249adad9e32e89e7163c1c295c1fb85c5674099e5319e70d77ef95af0e7bf  services_patched.jar
+91aad484ad6dde80e710039e7f82d765b648188b81a3cdb9ef5096005b27c0b2  oplus-services_patched.jar

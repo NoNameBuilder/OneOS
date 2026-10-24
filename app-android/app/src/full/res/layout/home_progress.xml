@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home while a system is set up: the bar (percent by bytes), the time
+     left, and what to keep doing. Goes into a card (Cards.section). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <androidx.appcompat.widget.SeslProgressBar
+        android:id="@+id/home_progress_bar"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/home_progress_label"
+        android:max="100" />
+
+    <TextView
+        android:id="@+id/home_progress_eta"
+        style="@style/OneOS.Text.Body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" />
+
+    <TextView
+        android:id="@+id/home_progress_note"
+        style="@style/OneOS.Text.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/home_setup_keep_open" />
+
+</LinearLayout>

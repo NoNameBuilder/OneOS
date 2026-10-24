@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Free up space: how full the phone is (the One UI bar, used of total) and
+     the line under it. Goes into a card (CardRows.storageBar). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <androidx.appcompat.widget.SeslProgressBar
+        android:id="@+id/oneos_storage_bar"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100" />
+
+    <TextView
+        android:id="@+id/oneos_storage_line"
+        style="@style/OneOS.Text.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
+</LinearLayout>

@@ -1,0 +1,13 @@
+gpio-keys
+meta_event
+pmic_pwrkey
+certify_hall
+pmic_resin
+sec_vibrator_inputff
+range_sensor
+als_rear
+sec_touchscreen
+sec_touchpad
+sec_touchproximity
+akm-digital-hall
+sec_e-pen

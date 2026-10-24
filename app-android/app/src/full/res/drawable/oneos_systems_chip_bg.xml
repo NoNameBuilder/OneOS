@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS.Systems.Chip: a 12dp-radius fact chip on the tile colour. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/oneos_tile_bg" />
+    <corners android:radius="12dp" />
+</shape>

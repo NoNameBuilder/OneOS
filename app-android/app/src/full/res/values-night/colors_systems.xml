@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark values of values/colors_systems.xml. -->
+    <color name="oneos_text_body">#D0D0D0</color>
+
+    <!-- The pending circle is 3.7:1 on the dark card. -->
+    <color name="oneos_ring_track">#2C313A</color>
+    <color name="oneos_step_pending">#6B7280</color>
+
+    <color name="oneos_sys0_tile">#2A2442</color>
+    <color name="oneos_sys0_fill">#A592F5</color>
+    <color name="oneos_sys1_tile">#19302A</color>
+    <color name="oneos_sys1_fill">#4CC3A0</color>
+    <color name="oneos_sys2_tile">#352A1C</color>
+    <color name="oneos_sys2_fill">#F0B060</color>
+</resources>

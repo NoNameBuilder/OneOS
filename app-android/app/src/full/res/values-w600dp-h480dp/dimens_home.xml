@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The inner screen (HomeInner.dc.html). -->
+    <dimen name="home_hero_art_width">284dp</dimen>
+    <dimen name="home_hero_art_height">158dp</dimen>
+</resources>

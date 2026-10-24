@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Choose a system and Setting up (SystemPicker.dc.html, SettingUp.dc.html).
+         Every style names its parent. -->
+
+    <!-- A system card's buttons: the One UI pills at 48dp and 15sp (the
+         mockup's 46dp, raised to the 48dp touch target). -->
+    <style name="OneOS.Systems.Button" parent="OneOS.Button.Secondary">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="OneOS.Systems.Button.Primary" parent="OneOS.Button.Primary">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <!-- The system's name on its card. -->
+    <style name="OneOS.Systems.Name" parent="">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <!-- The card's one-line description. -->
+    <style name="OneOS.Systems.Blurb" parent="">
+        <item name="android:lineSpacingMultiplier">1.15</item>
+        <item name="android:textColor">@color/oneos_text_body</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- A fact chip ("Android 17", "2.5 GB download"): not tappable. -->
+    <style name="OneOS.Systems.Chip" parent="">
+        <item name="android:background">@drawable/oneos_systems_chip_bg</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <!-- The state badge next to the name ("Set up"): white on the primary
+         colour (4.7:1 or more). The soft variant is set from code. -->
+    <style name="OneOS.Systems.Badge" parent="">
+        <item name="android:background">@drawable/oneos_systems_badge_bg</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- The title in a screen's hero (32sp light, as OneOS.Text.Hero). -->
+    <style name="OneOS.Systems.HeroTitle" parent="OneOS.Text.Hero">
+        <item name="android:gravity">center</item>
+    </style>
+
+    <!-- Setting up: the percent in the ring and the title under it. -->
+    <style name="OneOS.Setup.Percent" parent="">
+        <item name="android:fontFamily">sans-serif-light</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textSize">44sp</item>
+    </style>
+
+    <style name="OneOS.Setup.Title" parent="">
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textSize">26sp</item>
+    </style>
+</resources>

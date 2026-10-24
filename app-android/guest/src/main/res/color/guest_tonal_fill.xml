@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The "Add" pill; greyed once the tile is in Quick Settings. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.12" android:color="?android:attr/colorForeground" android:state_enabled="false" />
+    <item android:color="@color/guest_tonal" />
+</selector>

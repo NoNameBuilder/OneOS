@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The OneOS app's icon colour (app/src/full). -->
+    <color name="ic_launcher_background">#1C5FD6</color>
+
+    <!-- GuestReturn.dc.html. The rest of the screen takes the guest's own
+         DeviceDefault colours (Material on a Pixel), light or dark. -->
+    <!-- OneOS blue, the same in both modes: the mark. -->
+    <color name="oneos_blue">#1C5FD6</color>
+    <!-- "Back to One UI": a fill under white text, 5.7:1 (dark 4.7:1). -->
+    <color name="guest_primary">#1C5FD6</color>
+    <color name="guest_on_primary">#FFFFFF</color>
+    <!-- The tonal "Add" pill: 10.3:1 (dark 8.2:1). -->
+    <color name="guest_tonal">#D6E3FF</color>
+    <color name="guest_on_tonal">#0F2E62</color>
+    <color name="guest_ripple_on_primary">#33FFFFFF</color>
+</resources>

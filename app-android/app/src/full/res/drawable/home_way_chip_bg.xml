@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The 40dp chip behind a way-back icon (12dp corners). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/home_way_chip" />
+    <corners android:radius="12dp" />
+</shape>

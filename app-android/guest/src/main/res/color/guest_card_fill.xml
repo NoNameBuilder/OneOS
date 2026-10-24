@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The "Other ways back" card: the window colour, a shade darker in light
+     mode and lighter in dark mode (Material's surface container), on any
+     guest theme. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.06" android:color="?android:attr/colorForeground" />
+</selector>

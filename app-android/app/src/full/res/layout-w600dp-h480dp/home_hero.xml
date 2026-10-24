@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home's hero on the inner screen (HomeInner.dc.html, left card): the
+     larger picture and name, no "OneOS" line (the bar has it), and the
+     second line ("Your apps and data in it are kept"). The same ids as
+     layout/home_hero.xml. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/home_hero"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical">
+
+    <ImageView
+        android:id="@+id/home_hero_art"
+        android:layout_width="@dimen/home_hero_art_width"
+        android:layout_height="@dimen/home_hero_art_height"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_oneos_hero" />
+
+    <ImageView
+        android:id="@+id/home_hero_badge"
+        android:layout_width="@dimen/home_badge_size"
+        android:layout_height="@dimen/home_badge_size"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:src="@drawable/home_welcome_ok"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/home_hero_overline"
+        style="@style/OneOS.Text.Overline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:text="@string/home_overline"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/home_hero_title"
+        style="@style/OneOS.Text.Hero.Large"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:accessibilityHeading="true"
+        android:gravity="center" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.SeslProgressBar
+            android:id="@+id/home_hero_loader"
+            style="@style/Widget.AppCompat.ProgressBar.Small.Title"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginEnd="8dp"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/home_hero_line"
+            style="@style/OneOS.Text.Subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:gravity="center" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/home_hero_extra"
+        style="@style/OneOS.Text.Caption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+</LinearLayout>

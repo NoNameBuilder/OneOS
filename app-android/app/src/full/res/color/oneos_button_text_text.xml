@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Text of OneOS.Button.Text: the blue text colour (?attr/colorPrimaryDark = @color/oneos_primary_text). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.4" android:color="?attr/colorPrimaryDark" android:state_enabled="false" />
+    <item android:color="?attr/colorPrimaryDark" />
+</selector>

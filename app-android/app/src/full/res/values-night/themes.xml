@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme.OneOS itself is in values/ (OneUITheme picks its dark parent);
+         only the dialog overlays need dark parents here. -->
+    <style name="ThemeOverlay.OneOS.Dialog" parent="ThemeOverlay.AppCompat.Dialog">
+        <item name="colorPrimary">@color/oneos_primary</item>
+        <item name="colorPrimaryDark">@color/oneos_primary_text</item>
+        <item name="colorControlActivated">@color/oneos_primary_text</item>
+    </style>
+
+    <style name="ThemeOverlay.OneOS.Dialog.Alert" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+        <item name="colorPrimary">@color/oneos_primary</item>
+        <item name="colorPrimaryDark">@color/oneos_primary_text</item>
+        <item name="colorControlActivated">@color/oneos_primary_text</item>
+    </style>
+</resources>

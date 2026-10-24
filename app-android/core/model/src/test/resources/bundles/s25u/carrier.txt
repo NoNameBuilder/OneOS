@@ -1,0 +1,5 @@
+[gsm.operator.iso-country]: [ru,]
+[gsm.sim.operator.iso-country]: [ru,]
+[ro.boot.sales_code]: [INS]
+[ro.csc.countryiso_code]: [DE]
+[ro.csc.sales_code]: [EUX]

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS.Card: the One UI content surface with 26dp corners. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?android:attr/colorBackground" />
+    <corners android:radius="@dimen/oneos_card_radius" />
+</shape>

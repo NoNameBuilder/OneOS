@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The full edition (OneOS): its own texts and the switching screens. -->
+<resources>
+    <string name="app_name">OneOS</string>
+
+    <!-- Before you start (first launch until acknowledged; again from Home and About) -->
+    <string name="before_link_summary">What can break, backups and the screen lock</string>
+    <string name="before_experimental_title">OneOS is experimental</string>
+    <string name="before_backup_title">Back up first</string>
+    <string name="before_backup_summary">Back up your accounts and data first: Samsung Cloud, Google, Smart Switch.</string>
+    <string name="before_lock_title">Remove the screen lock</string>
+    <string name="before_apps_title">Apps you run inside the other system</string>
+    <string name="before_tested_title">Tested on one phone</string>
+    <string name="before_ack">I have backed up and removed my screen lock</string>
+
+    <!-- Home (the redesign: one status, one button). No system is named here:
+         %1$s is the image table's name (StringsNeutralTest). -->
+    <string name="home_subtitle">Another system next to One UI</string>
+    <string name="home_about_title">About OneOS</string>
+    <string name="home_checking">Checking your phone…</string>
+    <string name="home_choose">Choose a system</string>
+    <string name="home_system_ready">%1$s is ready</string>
+    <string name="home_system_row">Android %1$s · your apps and data are kept</string>
+    <string name="home_advanced">Advanced</string>
+    <string name="home_setting_up">Setting up %1$s · %2$d%%</string>
+    <string name="home_setting_up_start">Setting up %1$s</string>
+    <string name="home_eta">About %1$d min left</string>
+    <string name="home_eta_wait">Estimating time…</string>
+    <string name="home_setup_keep_open">Keep OneOS open and your phone plugged in.</string>
+    <string name="home_switching">Getting %1$s ready…</string>
+    <string name="home_closing">One UI is closing…</string>
+    <string name="home_restoring">Restoring One UI\'s settings…</string>
+    <string name="home_welcome">Welcome back</string>
+    <string name="home_welcome_line_short">%1$s</string>
+    <string name="home_minutes">%1$d min</string>
+    <string name="home_send_report">Send report to the OneOS team</string>
+    <string name="home_send_report_summary">Personal info is removed first: numbers, Wi-Fi names, accounts.</string>
+    <string name="home_dismiss">Dismiss</string>
+    <string name="home_details">Details</string>
+    <string name="home_details_all">All checks</string>
+    <string name="menu_how">Before you start</string>
+    <string name="menu_about">About OneOS</string>
+
+    <!-- Use a downloaded file: the texts that did not change (the rest: strings_advanced.xml) -->
+    <string name="image_choice_title">%1$s image</string>
+    <string name="image_pick_title">Pick the downloaded file</string>
+    <string name="image_picked_unnamed">Picked file</string>
+    <string name="image_size_unknown">Size unknown</string>
+    <string name="image_stop_summary">Stops the check. Nothing is kept.</string>
+    <string name="image_forget_title">Forget this file</string>
+    <string name="image_look_title">Look for a system on this phone</string>
+    <string name="image_look_again">Look again</string>
+    <string name="image_looking">Looking…</string>
+    <string name="image_on_phone_chosen_summary">Pick a downloaded file above to use that instead.</string>
+
+    <!-- Repair or start fresh: the texts that did not change (the rest: strings_advanced.xml) -->
+    <string name="prepare_cat_checks">Checks</string>
+    <string name="prepare_check_title">Check your phone</string>
+    <string name="prepare_check_again">Check again</string>
+    <string name="prepare_checking">Checking…</string>
+    <string name="prepare_check_dialog_title">Check as root?</string>
+    <string name="prepare_mode_keep">Keep its apps and data</string>
+    <string name="prepare_run_check_first">Check first</string>
+    <string name="prepare_run_stale">The last check is over 10 minutes old. Check again.</string>
+    <string name="prepare_run_blocked">Fix what\'s marked above first</string>
+    <string name="prepare_next_summary">Every check runs again before the switch</string>
+    <string name="prepare_delete_gz_title">Delete the downloaded file</string>
+    <string name="prepare_deleted">Deleted</string>
+    <string name="prepare_delete_failed">Could not delete the file</string>
+
+    <!-- All checks and Test run: the texts that did not change (the rest: strings_advanced.xml) -->
+    <string name="switch_back_force_title">Force restart</string>
+    <string name="switch_back_root_title">After you\'re back</string>
+    <string name="switch_cat_checks">Checks</string>
+    <string name="switch_cat_tick">Before you switch</string>
+    <string name="switch_blocked">Fix what\'s marked above first</string>
+    <string name="switch_tick_first">Tick every box above first</string>
+    <string name="switch_go_title">Switch to %1$s</string>
+    <string name="switch_starting">Starting…</string>
+    <string name="switch_launched">Started</string>
+    <string name="switch_not_started">Not started</string>
+    <string name="switch_dry_dialog_message">One UI closes for about a minute while root sets %1$s up and checks it. Then the phone restarts into One UI. OneOS closes with One UI.</string>
+    <string name="switch_go_dialog_title">Switch to %1$s now?</string>
+
+    <!-- Last session: the texts that did not change (the rest: strings_advanced.xml) -->
+    <string name="last_title">Last session</string>
+    <string name="last_id">Session %1$s</string>
+    <string name="last_cat_logs">Logs</string>
+    <string name="last_privacy_title">What is collected</string>
+    <string name="last_collect_dialog_title">Collect the logs as root?</string>
+    <string name="last_view_title">Session logs</string>
+    <string name="last_cat_restore">One UI\'s settings</string>
+    <string name="last_restore_title">Restore One UI\'s settings</string>
+    <string name="last_restore_run">Restore</string>
+    <string name="last_forget_title">Done with this session</string>
+
+    <!-- About -->
+    <string name="about_title">About OneOS</string>
+
+    <!-- Switch confirm (the redesign, step 4): a dialog from Home. -->
+    <string name="confirm_switch_title">Switch to %1$s?</string>
+    <string name="confirm_switch_msg">One UI closes and %1$s starts in about a minute. Nothing is erased.</string>
+    <string name="confirm_back_title">To come back</string>
+    <string name="confirm_back_app">Tap Back to One UI in %1$s</string>
+    <string name="confirm_back_keys">Hold Volume Up + Volume Down for 3 seconds</string>
+    <string name="confirm_back_keys_or">Or hold Volume Up + Volume Down for 3 seconds</string>
+    <string name="confirm_back_stuck">Stuck on the logo? Hold Power + Volume Down</string>
+    <string name="confirm_calls_2g">Calls in %1$s use 2G or 3G.</string>
+    <string name="confirm_gms_hidden">Google apps are hidden this time.</string>
+    <string name="confirm_setup_wizard">On a new setup, %1$s starts with its own setup screens: skip signing in to Google, and skip the screen lock, fingerprint and face (the phone\'s lock stays One UI\'s).</string>
+    <string name="confirm_switch_go">Switch</string>
+    <string name="confirm_refused_tail">Nothing changed. One UI keeps running.</string>
+    <string name="confirm_setup_title">Set up %1$s?</string>
+    <string name="confirm_setup_file">Uses the file you downloaded and takes about 15 minutes. Your apps and data in %1$s stay. Keep OneOS open and your phone plugged in.</string>
+    <string name="confirm_setup_go">Set up</string>
+    <string name="confirm_new_setup_msg">Uses about %1$s and takes about 15 minutes. Keep OneOS open and your phone plugged in. One UI keeps working meanwhile.</string>
+    <string name="confirm_setup_keep_data">Your %1$s apps and data are kept.</string>
+    <string name="confirm_setup_aside">Your %1$s apps and data are kept as an old copy. You can delete it later in Advanced › Free up space.</string>
+    <string name="confirm_setup_aside_unknown">What is set up now is kept as an old copy. You can delete it later in Advanced › Free up space.</string>
+    <string name="confirm_choose_download">Choose the %1$s download</string>
+
+    <!-- What the fix buttons say when they cannot do it themselves. -->
+    <string name="fix_open_root_app">Open your root app and allow OneOS.</string>
+    <string name="fix_no_app">No app found to open this</string>
+</resources>

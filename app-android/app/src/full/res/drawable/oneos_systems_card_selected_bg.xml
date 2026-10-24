@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The card of the system that is set up: OneOS.Card's surface with a 2dp
+     ring in the primary text colour, drawn inside the card (SystemPicker.dc.html
+     outline-offset -2px). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?android:attr/colorBackground" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/oneos_primary_text" />
+    <corners android:radius="@dimen/oneos_card_radius" />
+</shape>

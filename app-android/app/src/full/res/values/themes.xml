@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Full edition: One UI (io.github.oneuiproject:design) in OneOS blue. It
+         replaces src/main's plain Theme.OneOS for this flavor only, so OneOS
+         Probe keeps the stock look. OneUITheme switches to its dark parent by
+         itself; the colours come from values(-night)/colors.xml. -->
+    <style name="Theme.OneOS" parent="OneUITheme">
+        <item name="colorPrimary">@color/oneos_primary</item>
+        <item name="colorPrimaryDark">@color/oneos_primary_text</item>
+        <item name="colorControlActivated">@color/oneos_primary_text</item>
+        <!-- SESL's dialog overlays set colorPrimary(Dark) back to its own blue. -->
+        <item name="dialogTheme">@style/ThemeOverlay.OneOS.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.OneOS.Dialog.Alert</item>
+    </style>
+
+    <!-- Dialogs (light; values-night has the dark parents). -->
+    <style name="ThemeOverlay.OneOS.Dialog" parent="ThemeOverlay.AppCompat.Light.Dialog">
+        <item name="colorPrimary">@color/oneos_primary</item>
+        <item name="colorPrimaryDark">@color/oneos_primary_text</item>
+        <item name="colorControlActivated">@color/oneos_primary_text</item>
+    </style>
+
+    <style name="ThemeOverlay.OneOS.Dialog.Alert" parent="ThemeOverlay.AppCompat.Light.Dialog.Alert">
+        <item name="colorPrimary">@color/oneos_primary</item>
+        <item name="colorPrimaryDark">@color/oneos_primary_text</item>
+        <item name="colorControlActivated">@color/oneos_primary_text</item>
+    </style>
+</resources>

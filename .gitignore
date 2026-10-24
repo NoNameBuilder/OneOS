@@ -1,0 +1,14 @@
+firmware/
+out/
+build/
+*.raw
+*.img
+*.img.gz
+switcher/keystore/
+# Signing material lives outside the repository (~/.oneos-release).
+*.jks
+*.keystore
+keystore.properties
+# Python bytecode (switcher/patches).
+__pycache__/
+*.pyc

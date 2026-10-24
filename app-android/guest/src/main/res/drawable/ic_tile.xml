@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick Settings tile: the OneOS icon's two phones, one colour (SystemUI
+     tints it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="54"
+    android:viewportHeight="54">
+    <group
+        android:translateX="-27.5"
+        android:translateY="-27">
+        <path
+            android:fillAlpha="0.55"
+            android:fillColor="#FFFFFF"
+            android:pathData="M57,33h13a5,5 0,0 1,5 5v32a5,5 0,0 1,-5 5h-13a5,5 0,0 1,-5 -5v-32a5,5 0,0 1,5 -5z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M39,29h15a5,5 0,0 1,5 5v40a5,5 0,0 1,-5 5h-15a5,5 0,0 1,-5 -5v-40a5,5 0,0 1,5 -5z" />
+    </group>
+</vector>

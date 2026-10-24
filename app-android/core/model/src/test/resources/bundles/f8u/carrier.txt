@@ -1,0 +1,5 @@
+[gsm.operator.iso-country]: [sa,sa]
+[gsm.sim.operator.iso-country]: [sa,sa]
+[ro.boot.sales_code]: [KSA]
+[ro.csc.countryiso_code]: [SA]
+[ro.csc.sales_code]: [KSA]

@@ -1,0 +1,264 @@
+# OneOS Friend build 1 (0.2.1-probe): every command OneOS runs as root.
+#
+# This file is the complete list. probe.sh sources it and runs each entry with
+# `timeout <s> sh -c '<command>'`; the output goes to OneOS over a pipe and
+# OneOS saves it in its own cache folder. Every command only reads: nothing
+# writes a file, sets a property or a setting, starts, stops or changes an
+# app or service, mounts anything or writes to /sys or /proc. No logcat, no
+# telephony dumps. ProbeAudit (in :core:model) checks every entry against a
+# read-only allow-list in the unit tests and again in the app before each run.
+#
+# Besides these entries the app runs exactly two root commands:
+#   su -c id                                                    (root check, after a dialog)
+#   su -c "sh <app files>/probe/probe.sh <app files>/probe/commands.list"
+# and probe.sh itself runs only printf, timeout, sh -c, base64, cat, unzip -p
+# and stat.
+#
+# Grammar (ProbeCommandList; anything else is refused):
+#   #== <group title>
+#   #: <description of the next entry>
+#   run   <id> <timeout s> <output file>   '<command>'   stdout + stderr of the command
+#   files <id> <timeout s> <output folder> '<command>'   the command prints paths (or jar!entry);
+#                                                        each one is read and saved
+# Exit codes: 0 ok; 3 (said by the entry) or 127 not present; 124 timed out;
+# anything else failed. Commands use double quotes only.
+
+#== Build and system properties
+
+#: All system properties. IMEI, serial numbers, MAC addresses, SIM and phone numbers,
+#: Wi-Fi names and other personal values are removed before anything can be shared.
+run build.getprop 30 props/getprop.txt 'getprop'
+
+#: Build, One UI, model, chip and boot-state properties.
+run build.key 15 props/key.txt '
+for p in ro.build.fingerprint ro.build.id ro.build.display.id ro.build.version.release \
+    ro.build.version.sdk ro.build.version.sdk_full ro.build.version.oneui \
+    ro.build.version.security_patch ro.build.type ro.product.brand ro.product.manufacturer \
+    ro.product.model ro.product.device ro.product.vendor.device ro.product.name ro.soc.manufacturer \
+    ro.soc.model ro.board.platform ro.hardware ro.hardware.egl ro.product.cpu.abilist64 \
+    ro.vendor.api_level ro.board.api_level ro.product.first_api_level ro.vendor.build.version.sdk \
+    ro.boot.flash.locked ro.boot.verifiedbootstate ro.boot.vbmeta.device_state ro.boot.veritymode \
+    ro.boot.warranty_bit ro.warranty_bit ro.secure ro.debuggable ro.build.selinux; do
+  printf "%s=%s\n" "$p" "$(getprop "$p")"
+done'
+
+#== CPU
+
+#: CPU cores and features (/proc/cpuinfo).
+run cpu.cpuinfo 10 cpu/cpuinfo.txt 'cat /proc/cpuinfo'
+
+#: Kernel version (uname -a).
+run cpu.uname 10 cpu/uname.txt 'uname -a'
+
+#: CPU ID registers of each core (MIDR_EL1, REVIDR_EL1).
+run cpu.midr 10 cpu/midr.txt '
+found=0
+for d in /sys/devices/system/cpu/cpu[0-9]*; do
+  [ -r "$d/regs/identification/midr_el1" ] || continue
+  found=1
+  printf "%s midr=%s revidr=%s\n" "$d" "$(cat "$d/regs/identification/midr_el1")" "$(cat "$d/regs/identification/revidr_el1" 2>/dev/null)"
+done
+[ "$found" = 1 ] || exit 3'
+
+#== installd interface
+
+#: Java class path of One UI system_server (from its environment; nothing else of it).
+run installd.classpath 10 installd/classpath.txt '
+pid=$(pidof system_server)
+[ -n "$pid" ] || exit 1
+tr "\000" "\n" < "/proc/$pid/environ" | grep -E "^(BOOTCLASSPATH|SYSTEMSERVERCLASSPATH|DEX2OATBOOTCLASSPATH)="'
+
+#: Size and SHA-256 of the jars that may define android.os.IInstalld, and the framework folder listing.
+run installd.jars 120 installd/jars.txt '
+pid=$(pidof system_server)
+[ -n "$pid" ] || exit 1
+cp=$(tr "\000" "\n" < "/proc/$pid/environ" | sed -n -E "s/^(BOOTCLASSPATH|SYSTEMSERVERCLASSPATH)=//p" | tr ":" " ")
+for j in $(printf "%s\n" $cp /system/framework/services.jar | awk "!seen[\$0]++"); do
+  [ -f "$j" ] || continue
+  printf "%s %s\n" "$(stat -c %s "$j")" "$(sha256sum "$j")"
+done
+ls -l /system/framework
+[ -d /system/framework/oat/arm64 ] || exit 0
+ls -l /system/framework/oat/arm64'
+
+#: The dex files that define android.os.IInstalld$Stub (or the whole jar if under 15 MB),
+#: from the jars in class-loader order, so the OneOS team can derive the installd table.
+files installd.dex 300 installd '
+pid=$(pidof system_server)
+[ -n "$pid" ] || exit 1
+cp=$(tr "\000" "\n" < "/proc/$pid/environ" | sed -n -E "s/^(BOOTCLASSPATH|SYSTEMSERVERCLASSPATH)=//p" | tr ":" " ")
+for j in $(printf "%s\n" $cp /system/framework/services.jar | awk "!seen[\$0]++"); do
+  [ -f "$j" ] || continue
+  for e in $(unzip -l "$j" | grep -o -E "classes[0-9]*\.dex$"); do
+    unzip -p "$j" "$e" | grep -q -F "Landroid/os/IInstalld\$Stub\$Proxy;" || continue
+    if [ "$(stat -c %s "$j")" -lt 15728640 ]; then
+      printf "%s\n" "$j"
+      break
+    fi
+    printf "%s!%s\n" "$j" "$e"
+  done
+done
+true'
+
+#== Displays
+
+#: Physical displays and their ports (SurfaceFlinger).
+run display.sf 20 display/surfaceflinger.txt 'dumpsys SurfaceFlinger --display-id'
+
+#: Display devices (only the DisplayDeviceInfo, uniqueId and port lines; no Wi-Fi or virtual
+#: displays, whose names and addresses are those of the user's TV or PC).
+run display.dm 20 display/displaymanager.txt '
+dumpsys display | grep -E "DisplayDeviceInfo|uniqueId|port" | grep -v -E "type (WIFI|VIRTUAL)|(wifi|virtual):"'
+
+#: Camera cutouts and status bar height from One UI's framework resources. Each line
+#: is one read-only resource lookup; a folded Fold shows only the cover screen in the
+#: display dump, and the inner screen's under-display camera is only here.
+run display.res 30 display/framework_res.txt '
+printf "string/config_mainBuiltInDisplayCutout=%s\n" "$(cmd overlay lookup android android:string/config_mainBuiltInDisplayCutout 2>&1)"
+printf "string/config_mainBuiltInDisplayCutoutRectApproximation=%s\n" "$(cmd overlay lookup android android:string/config_mainBuiltInDisplayCutoutRectApproximation 2>&1)"
+printf "string/config_mainBuiltInDisplayCutoutForUDC=%s\n" "$(cmd overlay lookup android android:string/config_mainBuiltInDisplayCutoutForUDC 2>&1)"
+printf "string/config_subBuiltInDisplayCutout=%s\n" "$(cmd overlay lookup android android:string/config_subBuiltInDisplayCutout 2>&1)"
+printf "string/config_subBuiltInDisplayCutoutRectApproximation=%s\n" "$(cmd overlay lookup android android:string/config_subBuiltInDisplayCutoutRectApproximation 2>&1)"
+printf "dimen/status_bar_height_default=%s\n" "$(cmd overlay lookup android android:dimen/status_bar_height_default 2>&1)"
+printf "dimen/status_bar_height_portrait=%s\n" "$(cmd overlay lookup android android:dimen/status_bar_height_portrait 2>&1)"
+printf "dimen/rounded_corner_radius=%s\n" "$(cmd overlay lookup android android:dimen/rounded_corner_radius 2>&1)"'
+
+#: Listing of the display and device-state config folders.
+run display.ls 10 display/ls.txt '
+found=0
+for d in /vendor/etc/displayconfig /vendor/etc/devicestate /odm/etc/displayconfig /odm/etc/devicestate; do
+  [ -d "$d" ] || continue
+  found=1
+  printf "== %s\n" "$d"
+  ls -l "$d"
+done
+[ "$found" = 1 ] || exit 3'
+
+#: Display and device-state config files.
+files display.xml 20 display '
+for f in /vendor/etc/displayconfig/*.xml /vendor/etc/devicestate/*.xml /odm/etc/displayconfig/*.xml /odm/etc/devicestate/*.xml; do
+  [ -f "$f" ] && printf "%s\n" "$f"
+done
+true'
+
+#== Input and touch
+
+#: Input devices and their capabilities (getevent -p prints them and exits; no events are read).
+run input.getevent 15 input/getevent.txt 'getevent -pl'
+
+#: Input devices as the kernel lists them.
+run input.devices 10 input/proc_bus_input_devices.txt 'cat /proc/bus/input/devices'
+
+#: Input port associations (vendor and odm).
+files input.ports 10 input '
+for f in /vendor/etc/input-port-associations.xml /odm/etc/input-port-associations.xml; do
+  [ -f "$f" ] && printf "%s\n" "$f"
+done
+true'
+
+#: Samsung touch ICs: folder listing, input name, enabled state and command list (read only).
+run input.tsp 15 input/tsp.txt '
+found=0
+for d in /sys/class/sec/tsp*; do
+  [ -d "$d" ] || continue
+  found=1
+  printf "== %s\n" "$d"
+  ls "$d"
+  for n in input/name input/enabled enabled cmd_list; do
+    [ -r "$d/$n" ] || continue
+    printf "%s\n" "-- $n"
+    cat "$d/$n"
+  done
+done
+[ "$found" = 1 ] || exit 3'
+
+#== Backlight
+
+#: Panel backlight: maximum, current level and type.
+run backlight.sysfs 10 backlight/backlight.txt '
+found=0
+for d in /sys/class/backlight/*; do
+  [ -d "$d" ] || continue
+  found=1
+  for n in max_brightness brightness type; do
+    printf "%s/%s=%s\n" "$d" "$n" "$(cat "$d/$n" 2>/dev/null)"
+  done
+done
+[ "$found" = 1 ] || exit 3'
+
+#== HALs and services
+
+#: Registered binder services (names only).
+run hal.services 20 hal/services.txt '
+service list | sed -n -E "s/^[0-9]+[[:space:]]+([^:]+):.*/\1/p"'
+
+#: Init services and their state.
+run hal.initsvc 10 hal/init_svc.txt 'getprop | grep -E "^\[init\.svc\."'
+
+#: Vendor HAL binaries (names only).
+run hal.vendorbin 10 hal/vendor_bin_hw.txt '
+[ -d /vendor/bin/hw ] || exit 3
+ls /vendor/bin/hw'
+
+#: Vendor init scripts (names only).
+run hal.vendorinit 10 hal/vendor_etc_init.txt '
+[ -d /vendor/etc/init ] || exit 3
+ls /vendor/etc/init'
+
+#== SELinux policy
+
+#: Policy folders (names, sizes, dates).
+run selinux.ls 10 selinux/ls.txt '
+found=0
+for d in /system/etc/selinux /system_ext/etc/selinux /product/etc/selinux /vendor/etc/selinux /odm/etc/selinux; do
+  [ -d "$d" ] || continue
+  found=1
+  printf "== %s\n" "$d"
+  ls -l "$d"
+done
+[ "$found" = 1 ] || exit 3'
+
+#: SHA-256 of every CIL policy file.
+run selinux.cil 30 selinux/cil_sha256.txt '
+found=0
+for c in /system/etc/selinux/*.cil /system_ext/etc/selinux/*.cil /product/etc/selinux/*.cil /vendor/etc/selinux/*.cil /odm/etc/selinux/*.cil; do
+  [ -f "$c" ] || continue
+  found=1
+  sha256sum "$c"
+done
+[ "$found" = 1 ] || exit 3'
+
+#: Type declarations of the CIL policy (as guest_prepare.sh reads them, debug files skipped).
+run selinux.types 30 selinux/types.txt '
+found=0
+for c in /system/etc/selinux/*.cil /system_ext/etc/selinux/*.cil /product/etc/selinux/*.cil /vendor/etc/selinux/*.cil /odm/etc/selinux/*.cil; do
+  [ -f "$c" ] || continue
+  [ "${c#*debug}" = "$c" ] || continue
+  found=1
+  grep -h -o -E "^[[:space:]]*\((type|typealias)[[:space:]]+[^[:space:])]+" "$c"
+done
+[ "$found" = 1 ] || exit 3'
+
+#== Storage and root
+
+#: Free space on /data.
+run storage.df 10 storage/df.txt 'df /data'
+
+#: Whether a OneOS stage folder exists (the folder entries only): /data/local/tmp/oneos, or its path up to 0.3.6.
+run storage.stage 10 storage/stage.txt '
+found=0
+for d in /data/local/tmp/oneos /data/local/tmp/lineage_stage; do
+  if [ -e "$d" ] || [ -L "$d" ]; then ls -ld "$d"; found=1; fi
+done
+[ "$found" = 1 ] || exit 3'
+
+#: Who root runs as (uid and SELinux context) and the SELinux mode.
+run root.id 10 root/id.txt 'id; getenforce'
+
+#: Root manager and its version (whichever of ksud, magisk and apd exists).
+run root.manager 15 root/manager.txt '
+found=0
+if [ -x /data/adb/ksud ]; then printf "kernelsu "; /data/adb/ksud -V; found=1; fi
+if command -v magisk >/dev/null 2>&1; then printf "magisk "; magisk -v; printf "magisk-code "; magisk -V; found=1; fi
+if [ -x /data/adb/apd ]; then printf "apatch "; /data/adb/apd -V; found=1; fi
+[ "$found" = 1 ] || exit 3'

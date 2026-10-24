@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS Probe: the read-only tests and the findings, nothing that prepares
+     or switches (no ColorOS group; the full edition's home is in src/full). -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/home_cat_phone">
+        <Preference
+            android:key="check_phone"
+            android:summary="@string/home_check_summary"
+            android:title="@string/home_check_title" />
+        <Preference
+            android:key="run_tests"
+            android:summary="@string/home_tests_summary"
+            android:title="@string/home_tests_title" />
+        <Preference
+            android:key="send_findings"
+            android:selectable="false"
+            android:summary="@string/home_send_summary"
+            android:title="@string/home_send_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/home_cat_app">
+        <Preference
+            android:key="before_you_start"
+            android:summary="@string/before_link_summary"
+            android:title="@string/before_title" />
+        <Preference
+            android:key="about"
+            android:summary="@string/home_about_summary"
+            android:title="@string/home_about_title" />
+        <Preference
+            android:key="tested"
+            android:selectable="false"
+            android:summary="@string/tested_scope"
+            android:title="@string/about_tested_title" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

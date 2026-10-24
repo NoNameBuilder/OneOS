@@ -1,0 +1,15 @@
+gpio-keys
+meta_event
+certify_hall
+flip
+pmic_pwrkey
+pmic_resin
+sec_vibrator_inputff
+grip_sensor_sub
+grip_notifier
+sec_touchscreen2
+sec_touchproximity2
+sec_touchscreen
+sec_touchpad
+sec_touchproximity
+als_rear

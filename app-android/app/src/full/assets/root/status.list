@@ -1,0 +1,155 @@
+# OneOS 0.3.0: the read-only stage check, run as root before Prepare and Switch.
+#
+# The same runner (assets/probe/probe.sh) and grammar as the probe list, and the
+# same read-only audit (ProbeAudit, in the unit tests and again in the app
+# before every run): every command only reads. Root writes no file here; the
+# output goes to OneOS over a pipe and stays in its cache until the screen has
+# read it. Every change to the stage is a verb of assets/root/oneos_root.sh.
+#
+# Exit codes: 0 ok; 3 not present; anything else failed. Commands use double
+# quotes only.
+#
+# The stage is /data/local/tmp/oneos. Up to 0.3.6 it was
+# /data/local/tmp/lineage_stage, which the root script renames (migrate_legacy)
+# before its next verb: while nothing is at the new path and the old one is a
+# folder, every entry reads the old one, as the launcher does.
+
+#== Stage
+
+#: The stage folder: whether it exists, and its owner and mode.
+run stage.dir 10 stage/dir.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+if [ -L "$S" ]; then echo link; exit 0; fi
+if [ -d "$S" ]; then stat -c "dir %u %g %a" "$S"; exit 0; fi
+[ -e "$S" ] || exit 3
+echo file'
+
+#: Every entry at the top of the stage: type, owner, mode, size and name.
+run stage.list 20 stage/list.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+[ -d "$S" ] || exit 3
+for f in "$S"/* "$S"/.oneos_stage "$S"/bin/oneos_root.sh; do
+  if [ -L "$f" ]; then t=l; elif [ -d "$f" ]; then t=d; elif [ -f "$f" ]; then t=f; else continue; fi
+  printf "%s %s %s\n" "$t" "$(stat -c "%u %a %s" "$f")" "${f#$S/}"
+done'
+
+#: OneOS's marker (.oneos_stage): which app build prepared which image for which phone.
+run stage.marker 10 stage/marker.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+f="$S/.oneos_stage"
+[ -f "$f" ] || exit 3
+cat "$f"'
+
+#: The prepared files and their SHA-256 (files.sha256).
+run stage.sums 10 stage/files.sha256 '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+f="$S/files.sha256"
+[ -f "$f" ] || exit 3
+cat "$f"'
+
+#: SHA-256 of every file at the top of the stage except the 10 GB image, and of the root script.
+run stage.hashes 120 stage/hashes.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+[ -d "$S" ] || exit 3
+for f in "$S"/* "$S"/bin/oneos_root.sh; do
+  [ -f "$f" ] || continue
+  [ -L "$f" ] && continue
+  [ "$f" = "$S/system.raw" ] && continue
+  sha256sum "$f"
+done
+true'
+
+#: The image: what was verified when it was staged (system.raw.id) and its size and identity now.
+run stage.raw 10 stage/raw.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+[ -f "$S/system.raw" ] || exit 3
+printf "now %s\n" "$(stat -c "%s %d:%i:%s:%Y" "$S/system.raw")"
+[ -f "$S/system.raw.id" ] || exit 0
+printf "id %s\n" "$(cat "$S/system.raw.id")"'
+
+#: The session settings the app wrote (session.env).
+run stage.env 10 stage/session.env '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+f="$S/session.env"
+[ -f "$f" ] || exit 3
+cat "$f"'
+
+#: SHA-256 of the installd table the app wrote (host_installd.table).
+run stage.table 10 stage/table.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+f="$S/host_installd.table"
+[ -f "$f" ] || exit 3
+sha256sum "$f"'
+
+#: Mounts at or under the stage, in init's mount namespace and in this one.
+run stage.mounts 10 stage/mounts.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+awk -v p="$S" "\$5 == p { print \"init \" \$5 }" /proc/1/mountinfo
+awk -v p="$S/" "index(\$5, p) == 1 { print \"init \" \$5 }" /proc/1/mountinfo
+awk -v p="$S" "\$5 == p { print \"self \" \$5 }" /proc/self/mountinfo
+awk -v p="$S/" "index(\$5, p) == 1 { print \"self \" \$5 }" /proc/self/mountinfo
+awk "\$5 == \"/\" { print \"root ok\" }" /proc/1/mountinfo'
+
+#: Host /data trees of bridges.sh that are mount points now (a session that never returned).
+run stage.bridges 10 stage/bridges.txt '
+for h in app app-staging user user_de dalvik-cache misc/profiles data media misc/user misc_ce/0/sdksandbox misc_de/0/sdksandbox misc_ce/0/rollback misc_de/0/rollback resource-cache; do
+  awk -v p="/data/$h" "\$5 == p { print \$5 }" /proc/1/mountinfo
+done
+true'
+
+#: Loop devices whose backing file is in the stage.
+run stage.loops 10 stage/loops.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+grep -h -s -F "$S/" /sys/block/loop*/loop/backing_file
+true'
+
+#: An unfinished session (persist_session.active) and this boot's id.
+run stage.session 10 stage/session.txt '
+printf "boot=%s\n" "$(cat /proc/sys/kernel/random/boot_id)"
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+f="$S/persist_session.active"
+[ -f "$f" ] || exit 0
+printf "active\n"
+grep -E "^(format|boot_id|epoch|app|profile)=" "$f"'
+
+#: Whose data the guest folder holds (ColorOS, LineageOS or Pixel packages: Pixel's launcher), without reading the data.
+run stage.guest 10 stage/guest.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+p="$S/data/system/packages.xml"
+[ -d "$S/data" ] || exit 3
+[ -f "$p" ] || { echo "packages none"; exit 0; }
+for w in com.oplus. com.coloros. org.lineageos. com.google.android.apps.nexuslauncher; do
+  if grep -q -s -F "$w" "$p"; then echo "packages $w"; fi
+done
+true'
+
+#: Stages moved aside earlier (oneos.old-*, and lineage_stage.old-* up to 0.3.6).
+run stage.old 10 stage/old.txt '
+for d in /data/local/tmp/oneos.old-* /data/local/tmp/lineage_stage.old-*; do [ -e "$d" ] && printf "%s\n" "$d"; done
+true'
+
+#: Executables in the root manager's folders, where the session scripts look for busybox and its prop tool.
+run stage.tools 10 stage/tools.txt '
+for d in /data/adb/ksu/bin /data/adb/ap/bin /data/adb/magisk; do
+  [ -d "$d" ] || continue
+  for f in "$d"/*; do [ -x "$f" ] && printf "%s\n" "$f"; done
+done
+true'
+
+#: Carrier, build and boot-reason properties.
+run stage.props 10 stage/props.txt '
+for p in ro.csc.sales_code ro.boot.sales_code ro.csc.countryiso_code gsm.sim.operator.iso-country ro.build.fingerprint ro.product.model ro.product.device ro.soc.model ro.build.version.sdk sys.boot.reason; do
+  printf "%s=%s\n" "$p" "$(getprop "$p")"
+done'

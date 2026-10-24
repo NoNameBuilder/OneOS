@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Setting up: the step in progress (SettingUp.dc.html), a quarter arc on
+     the ring track. Decorative: the row says its state. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+    <path
+        android:pathData="M2,14a12,12 0,1 1,24,0a12,12 0,1 1,-24,0z"
+        android:strokeColor="@color/oneos_ring_track"
+        android:strokeWidth="3" />
+    <path
+        android:pathData="M14,2a12,12 0,0 1,12,12"
+        android:strokeColor="@color/oneos_primary_text"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+</vector>

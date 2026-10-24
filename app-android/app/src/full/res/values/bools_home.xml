@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home in two panes (the inner screen, layout-w600dp-h480dp): the bar names
+         the app, so the hero has no "OneOS" line, and the button sits in the hero. -->
+    <bool name="home_two_pane">false</bool>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Welcome back tile (WelcomeBack.dc.html "Your time in …"): a value and
+     what it is ("12 min" / "in …", "Back to One UI" / "how you came back").
+     TalkBack reads it as one item. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/OneOS.Tile"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="14dp"
+    android:screenReaderFocusable="true">
+
+    <TextView
+        android:id="@+id/home_stat_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-light"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="26sp" />
+
+    <TextView
+        android:id="@+id/home_stat_label"
+        style="@style/OneOS.Text.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" />
+
+</LinearLayout>

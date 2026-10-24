@@ -1,0 +1,88 @@
+# OneOS 0.3.0: the last session's logs, read as root after the return to One UI
+# (Last session, Collect logs). docs/app/compat-safety-logs.md sections 3.1, 3.3.
+#
+# The same runner (assets/probe/probe.sh) and grammar as the probe list, and
+# the same read-only audit (ProbeAudit): every command only reads, root writes
+# no file. The output goes to OneOS over a pipe and is redacted line by line
+# before it is written to the app's cache (logcat lines of personal tags are
+# dropped, personal values masked). Text files only: never the screen
+# recordings (oneos_rec_*.mp4) or screenshots (shot_*.png, fold_*.png).
+#
+# The first two entries are kept in memory only, never saved or shared: they
+# tell the redaction which Wi-Fi network names and Bluetooth device names to
+# remove from everything after them.
+#
+# The stage is /data/local/tmp/oneos; while nothing is there and its path up
+# to 0.3.6 (/data/local/tmp/lineage_stage) is a folder, the entries read that
+# one (a session of 0.3.6, not prepared again since).
+
+#== Names to remove
+
+#: Saved Wi-Fi network and hotspot names of One UI and of the guest (the name
+#: elements only; no passwords are read). Kept in memory to remove them from the logs.
+run logs.ssids 20 memory/ssids.txt '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+for f in /data/misc/apexdata/com.android.wifi/WifiConfigStore.xml /data/misc/apexdata/com.android.wifi/WifiConfigStoreSoftAp.xml /data/misc/wifi/WifiConfigStore.xml /data/misc/wifi/softap.conf "$S/data/misc/apexdata/com.android.wifi/WifiConfigStore.xml" "$S/data/misc/apexdata/com.android.wifi/WifiConfigStoreSoftAp.xml"; do
+  [ -f "$f" ] && grep -h -o -i -E "name=\"[a-z]*ssid\".[^<]*" "$f"
+done
+for d in /data/misc_ce/*/apexdata/com.android.wifi; do
+  [ -f "$d/WifiConfigStore.xml" ] && grep -h -o -i -E "name=\"[a-z]*ssid\".[^<]*" "$d/WifiConfigStore.xml"
+done
+true'
+
+#: Input devices as the kernel lists them. Kept in memory to remove Bluetooth device names from the logs.
+run logs.input 10 memory/input_devices.txt 'cat /proc/bus/input/devices'
+
+#== Session
+
+#: Why the phone last booted (the return reboots with reason oneos-return).
+run logs.reason 10 boot/reason.txt '
+printf "sys.boot.reason=%s\n" "$(getprop sys.boot.reason)"
+printf "persist.sys.boot.reason.history=%s\n" "$(getprop persist.sys.boot.reason.history)"'
+
+#: The session record the app's launch wrote (session/current.json).
+run logs.current 10 stage/current.json '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+f="$S/session/current.json"
+[ -f "$f" ] || exit 3
+cat "$f"'
+
+#: The switch, return and watcher logs in the stage (takeover_app.log, auto_return.log, ...).
+files logs.stage 120 stage '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+for f in "$S"/*.log; do [ -f "$f" ] && printf "%s\n" "$f"; done
+true'
+
+#: The guest's logs in its /data (takeover.log, call_audio.log, audio_keeper.log, backlight.log, ...).
+files logs.guest 120 guest '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+for f in "$S"/data/*.log; do [ -f "$f" ] && printf "%s\n" "$f"; done
+true'
+
+#: Host helper logs (UI activator, adb and IMS watchdogs).
+files logs.host 60 host '
+for f in /data/local/tmp/ui_activator.log /data/local/tmp/adb_watchdog.log /data/local/tmp/ims_watchdog.log /data/local/tmp/restore_app.log; do
+  [ -f "$f" ] && printf "%s\n" "$f"
+done
+true'
+
+#: Diagnostics rounds of the session: text files only (.txt, .log, .xml, .err), no screenshots.
+files logs.diag 120 diag '
+S=/data/local/tmp/oneos
+[ -e "$S" ] || [ -L "$S" ] || [ ! -d /data/local/tmp/lineage_stage ] || [ -L /data/local/tmp/lineage_stage ] || S=/data/local/tmp/lineage_stage
+for f in "$S"/diag_*/*; do
+  [ -f "$f" ] || continue
+  for e in .txt .log .xml .err; do
+    [ "${f%$e}" != "$f" ] && printf "%s\n" "$f"
+  done
+done
+true'
+
+#: The session's full log capture (oneos_logs/boot.log*, all buffers, 20 MB each).
+files logs.capture 300 capture '
+for f in /data/local/tmp/oneos_logs/boot.log*; do [ -f "$f" ] && printf "%s\n" "$f"; done
+true'

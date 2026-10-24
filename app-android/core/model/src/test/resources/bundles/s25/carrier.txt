@@ -1,0 +1,5 @@
+[gsm.operator.iso-country]: [fr,]
+[gsm.sim.operator.iso-country]: [fr]
+[ro.boot.sales_code]: [INS]
+[ro.csc.countryiso_code]: [IN]
+[ro.csc.sales_code]: [INS]

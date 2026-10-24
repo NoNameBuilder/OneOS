@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Redesign sizes (docs/app/redesign-2.md), from the mockup (1 CSS px = 1 dp). -->
+    <dimen name="oneos_card_radius">26dp</dimen>
+    <dimen name="oneos_tile_radius">16dp</dimen>
+    <dimen name="oneos_button_height">52dp</dimen>
+    <dimen name="oneos_button_radius">26dp</dimen>
+    <!-- Side padding of the hero and the footer button. -->
+    <dimen name="oneos_screen_gutter">24dp</dimen>
+    <!-- Cards stand this far from the screen edge, and this far from each other. -->
+    <dimen name="oneos_card_inset">10dp</dimen>
+    <dimen name="oneos_card_gap">12dp</dimen>
+    <dimen name="oneos_card_padding">18dp</dimen>
+    <dimen name="oneos_card_padding_bottom">16dp</dimen>
+    <!-- A card that holds rows: rows reach the card's edges. -->
+    <dimen name="oneos_card_list_padding">6dp</dimen>
+    <dimen name="oneos_tile_gap">8dp</dimen>
+    <dimen name="oneos_tile_padding">12dp</dimen>
+    <dimen name="oneos_row_min_height">56dp</dimen>
+    <dimen name="oneos_row_padding_horizontal">18dp</dimen>
+    <dimen name="oneos_row_icon_gap">14dp</dimen>
+</resources>

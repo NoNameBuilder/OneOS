@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The content column on a wide screen (the inner screen, a tablet). -->
+    <dimen name="guest_content_max_width">520dp</dimen>
+</resources>

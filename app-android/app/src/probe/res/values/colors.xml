@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Green, so OneOS Probe never looks like the OneOS app (blue) on the launcher. -->
+    <color name="ic_launcher_background">#0B7A5C</color>
+</resources>

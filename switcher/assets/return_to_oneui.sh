@@ -1,0 +1,589 @@
+#!/system/bin/sh
+# Return to One UI / Safe State Restoration
+
+# Every unmount here goes through umnt, never Android's own umount (toybox).
+# After unmounting, toybox umount also sends LOOP_CLR_FD to the mount's source
+# device unless given -D. For the stage's binds of One UI's /data APEXes (com.
+# android.uwb, wifi@<ver>, nfcservices, ...) that device is One UI's dm-verity
+# device; dm passes the ioctl down to its loop, which then stops serving reads
+# while the APEX stays mounted. That was every failed in-place return: SIGBUS in
+# NfcNciApex.apk and framework-ranging.jar, WifiService NPE, RescueParty, and
+# "EXT4-fs (device dm-66): panic forced after error" when the next program read
+# a module directory (attempts 9-13 and the scratch tests of 2026-10-21; runs
+# 28/29 died inside the return). busybox umount detaches a loop only with -d.
+# guest_prepare.sh and guest_start.sh only ever use busybox, which is why the
+# setup checks always read clean. The reboot return had the same risk before
+# restore-persist ran.
+BB=""
+for c in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
+    [ -x "$c" ] && { BB=$c; break; }
+done
+umnt() {
+    if [ -n "$BB" ]; then "$BB" umount "$@" 2>/dev/null; else umount -D "$@" 2>/dev/null; fi
+}
+S=/data/local/tmp/oneos
+# What the in-place return compares against (taken by oneos_switch.sh with
+# "return_to_oneui.sh baseline" while One UI still runs, before any change but
+# the persist snapshot).
+BASE=$S/inplace_base
+
+# One UI's block-backed /apex mounts ("maj:min mount point"), from init's table.
+apex_mounts() {
+    "$BB" awk '$5 ~ /^\/apex\// && $3 !~ /^0:/ {print $3, $5}' /proc/1/mountinfo | "$BB" sort
+}
+loop_line() {
+    b=/sys/block/$1
+    echo "loop $1 dev=$("$BB" cat $b/dev 2>/dev/null) file=$("$BB" cat $b/loop/backing_file 2>/dev/null) offset=$("$BB" cat $b/loop/offset 2>/dev/null) limit=$("$BB" cat $b/loop/sizelimit 2>/dev/null) size=$("$BB" cat $b/size 2>/dev/null)"
+}
+# Everything about those devices that a broken teardown would change: which
+# device backs each module, the dm table's name, uuid and size, the loop under
+# it and that loop's backing file. Sysfs only; nothing reads through a module.
+apex_state() {
+    apex_mounts | while read -r mm mp; do echo "mount $mp $mm"; done
+    for mm in $(apex_mounts | "$BB" awk '{print $1}' | "$BB" sort -u); do
+        d=$("$BB" readlink /sys/dev/block/$mm 2>/dev/null); d=${d##*/}
+        [ -n "$d" ] || { echo "dev $mm missing"; continue; }
+        b=/sys/block/$d
+        case $d in
+            dm-*)
+                echo "dev $mm $d name=$("$BB" cat $b/dm/name 2>/dev/null) uuid=$("$BB" cat $b/dm/uuid 2>/dev/null) size=$("$BB" cat $b/size 2>/dev/null) ro=$("$BB" cat $b/ro 2>/dev/null) slaves=$("$BB" ls $b/slaves 2>/dev/null | "$BB" tr '\n' ,)"
+                for l in $("$BB" ls $b/slaves 2>/dev/null); do loop_line "$l"; done ;;
+            loop*) echo "dev $mm $d"; loop_line "$d" ;;
+            *) echo "dev $mm $d size=$("$BB" cat $b/size 2>/dev/null)" ;;
+        esac
+    done | "$BB" sort -u
+}
+# The pid servicemanager has for a name, or nothing. Only a line that is all
+# digits counts: "Can't find service: ...keystore2..." would otherwise read as 2.
+svc_pid() {
+    o=$(timeout 5 dumpsys --pid "$1" 2>/dev/null | head -n 1)
+    case "$o" in ''|*[!0-9]*) ;; *) echo "$o" ;; esac
+}
+# servicemanager names the guest must never have taken from One UI. One UI's
+# vold cannot be restarted (init.rc: reboot_on_failure), keystore2 is critical.
+HOST_NAMES="vold android.system.vold.IVold/default android.system.keystore2.IKeystoreService/default installd android.service.gatekeeper.IGateKeeperService"
+
+if [ "$1" = baseline ]; then
+    [ -n "$BB" ] || { echo "In-place baseline: no busybox, not taken (the return will reboot)"; exit 0; }
+    rm -rf "$BASE"; mkdir -p "$BASE" || exit 0
+    cat /proc/sys/kernel/random/boot_id > "$BASE/boot_id" 2>/dev/null
+    getprop > "$BASE/props"
+    getenforce > "$BASE/selinux" 2>&1
+    apex_state > "$BASE/apex"
+    ip rule show > "$BASE/iprule" 2>&1
+    for f in /sys/fs/f2fs/*/gc_urgent; do [ -f "$f" ] && echo "$f $(cat "$f" 2>/dev/null)"; done > "$BASE/gc_urgent"
+    for n in $HOST_NAMES; do p=$(svc_pid "$n"); echo "$n ${p:-none}"; done > "$BASE/svcpid"
+    ls -lZ /dev/watchdog* > "$BASE/watchdog" 2>&1
+    # The kernel log from here on is scanned for I/O errors on these devices.
+    m="oneos-baseline $(date +%s)"
+    echo "$m" > /dev/kmsg 2>/dev/null && echo "$m" > "$BASE/kmsg"
+    echo "In-place baseline: $(grep -c '^mount ' "$BASE/apex") One UI APEX mounts on $(grep -c '^dev ' "$BASE/apex") devices, vold pid $(awk '$1 == "vold" {print $2}' "$BASE/svcpid"), SELinux $(cat "$BASE/selinux")"
+    exit 0
+fi
+# The return must finish even if the adb session that started it goes away.
+trap '' HUP PIPE
+
+echo "=== [1/4] Terminating Container Supervision & Zygote ==="
+# A screen recording (guest_start.sh) is finalised on SIGINT; SIGKILL would
+# leave an unplayable segment. Nothing on the host is called screenrecord.
+# The flag stops guest_start.sh's segment loop first: in run 31 it started
+# segment 6 as soon as segment 5 was finalised, that one was killed with the
+# guest (a 30 KB unplayable file) and its retry logged 'Failed to get display
+# id' once SurfaceFlinger was gone.
+touch /data/local/tmp/oneos/data/oneos_rec_stop 2>/dev/null
+# The return-keys readers (oneos_switch.sh) live in the host namespace.
+# Only kill a listed PID when it was armed this boot AND is still a
+# oneos_switch.sh shell: after a reboot the pids file is stale and the ids
+# are recycled (an early return before arming would otherwise signal vold/apexd
+# or this script itself). oneos_switch.sh clears return_keys at its own
+# preflight, so the file only ever holds this boot's readers.
+KS=/data/local/tmp/oneos/return_keys
+if [ "$(cat "$KS/boot" 2>/dev/null)" = "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)" ]; then
+    for p in $(cat "$KS/pids" 2>/dev/null); do
+        case "$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)" in
+            *oneos_switch.sh*) kill "$p" 2>/dev/null ;;
+        esac
+    done
+fi
+pkill -INT -x screenrecord 2>/dev/null && sleep 2
+pkill -9 -f "ctl.stop zygote" 2>/dev/null || true
+pkill -9 -f "kill -STOP" 2>/dev/null || true
+pkill -9 -f "ui_activator" 2>/dev/null || true
+pkill -9 -f "zygote_exec" 2>/dev/null || true
+# Stop the adb watchdog started by oneos_switch.sh before One UI's own
+# system_server comes back, so it cannot fight init over sys.usb.config.
+pkill -9 -f "adb_watchdog.sh" 2>/dev/null || true
+pkill -9 -f "ims_watchdog.sh" 2>/dev/null || true
+pkill -9 -f "system_server" 2>/dev/null || true
+pkill -9 -f org.lineageos 2>/dev/null || true
+pkill -9 -x zygote64 2>/dev/null || true
+kill -9 $(pidof surfaceflinger) 2>/dev/null || true
+
+# Every process still in the container's mount namespace (recorded by
+# oneos_switch.sh). The host's own namespace is never touched.
+GUEST_NS=$(cat /data/local/tmp/oneos/guest_mntns 2>/dev/null)
+HOST_NS=$(readlink /proc/1/ns/mnt)
+# Apps have mount namespaces of their own (zygote unshares one per app); they
+# are found by their root, which is the guest's root filesystem.
+GUEST_DEV=$(cat /data/local/tmp/oneos/guest_rootdev 2>/dev/null)
+HOST_DEV=$(stat -L -c %d /proc/1/root/ 2>/dev/null)
+[ "$GUEST_DEV" = "$HOST_DEV" ] && GUEST_DEV=""
+if [ -n "$GUEST_NS" ] && [ "$GUEST_NS" != "$HOST_NS" ]; then
+    # Repeated: a guest zygote or init-like parent can fork while the first
+    # pass runs, and nothing of the guest may outlive the return.
+    pass=1
+    while [ $pass -le 5 ]; do
+        killed=""
+        for p in /proc/[0-9]*; do
+            if [ "$(readlink "$p/ns/mnt" 2>/dev/null)" != "$GUEST_NS" ]; then
+                [ -n "$GUEST_DEV" ] && [ "$(stat -L -c %d "$p/root/" 2>/dev/null)" = "$GUEST_DEV" ] || continue
+            fi
+            pid=${p#/proc/}
+            killed="$killed $pid:$(cat "$p/comm" 2>/dev/null)"
+            kill -9 "$pid" 2>/dev/null
+        done
+        if [ $pass = 1 ]; then echo "Killed guest processes:${killed:- none}"
+        elif [ -n "$killed" ]; then echo "Killed guest processes (pass $pass):$killed"; fi
+        [ -n "$killed" ] || break
+        pass=$((pass + 1)); sleep 0.3
+    done
+fi
+# net_watch (oneos_switch.sh) rewrote routes until the rootfs was gone, 8 s
+# into run 43's return; it has no business in the return.
+pkill -9 -f "$S/rootfs/system/build.prop" 2>/dev/null || true
+rm -f /data/local/tmp/oneos/guest_mntns
+
+# Put the host's own /data trees back FIRST: guest_prepare.sh bridges the
+# staged app trees (installd/artd write there), and nothing may start One UI
+# on top of the guest's copies.
+# (Fallback if bridges.sh is gone; keep in step with it.)
+BRIDGES="app:app app-staging:app-staging user:user user_de:user_de dalvik-cache:dalvik-cache misc/profiles:misc/profiles data:user/0 media:media misc/user:misc/user misc_ce/0/sdksandbox:misc_ce/0/sdksandbox misc_de/0/sdksandbox:misc_de/0/sdksandbox misc_ce/0/rollback:misc_ce/0/rollback misc_de/0/rollback:misc_de/0/rollback resource-cache:resource-cache"
+[ -f /data/local/tmp/oneos/bridges.sh ] && . /data/local/tmp/oneos/bridges.sh
+for pair in $BRIDGES; do
+    d=${pair%%:*}
+    umnt "/data/$d" || umnt -l "/data/$d" || true
+done
+# Never touch One UI's files, or start One UI in place, while a bridge is
+# still there: it would act on the guest's staged copy.
+still_bridged=""
+for pair in $BRIDGES; do
+    d=${pair%%:*}
+    awk -v p="/data/$d" '$5 == p' /proc/self/mountinfo | grep -q . && still_bridged="$still_bridged /data/$d"
+done
+if [ -n "$still_bridged" ]; then
+    echo "!!! still bridged:$still_bridged; rebooting"
+    ONEOS_RETURN_MODE=reboot
+fi
+# OneOS: One UI Home's databases are no longer copied back here from
+# /data/local/tmp/lineage_backups (OneLineage's snapshot): that was the only
+# intended write into One UI's app data, and the switch no longer takes it.
+
+# One UI's protected state against the record the switch made (see
+# oneos_switch.sh): every guest process is gone by now. Logged only.
+host_state() {
+    f=$(readlink -f "$(getprop ro.frp.pst)" 2>/dev/null)
+    [ -b "$f" ] && echo "frp $(sha256sum "$f" 2>/dev/null | cut -d' ' -f1)"
+    for p in /data/misc/gatekeeper /data/apex/active /data/apex/sessions; do
+        [ -d "$p" ] && find "$p" -type f -exec stat -c '%n %s %Y' {} + 2>/dev/null | sort
+    done
+}
+if [ -f "$S/host_state.before" ]; then
+    host_state > "$S/host_state.after"
+    if cmp -s "$S/host_state.before" "$S/host_state.after"; then
+        echo "$(date) host state unchanged ($(wc -l < "$S/host_state.after") entries)" >> "$S/host_state.log"
+    else
+        { echo "$(date) !!! host state changed during the session:"
+          diff "$S/host_state.before" "$S/host_state.after"; } >> "$S/host_state.log" 2>&1
+    fi
+    tail -n 1 "$S/host_state.log" | grep -q "unchanged" && echo "Host state unchanged" || echo "!!! Host state changed: see $S/host_state.log"
+fi
+
+echo "=== [2/4] Unmounting Container Overlays ==="
+# OneOS: never unmount through a glob of the rootfs. The guest image's top
+# level has absolute symlinks (system_ext -> /system/system_ext, product,
+# sdcard, ...), and in the host namespace "umount -l rootfs/*" followed them to
+# the HOST's /system_ext and /product partitions: One UI's surfaceflinger then
+# failed with "CANNOT LINK ... libdisplayconfig.system.qti.so not found" and the
+# phone rebooted. Unmount exactly what /proc/mounts lists under the rootfs,
+# deepest first.
+# Everything under the stage dir, not just the rootfs: binds that leaked out of
+# the rootfs (e.g. $STAGE/data/apex) and the system_ext overlay tmpfs too.
+ROOTFS=/data/local/tmp/oneos/rootfs
+STAGE_ROOT=/data/local/tmp/oneos
+# OneOS: detach the whole stage tree from host propagation first. guest_prepare
+# makes each bind rslave/rprivate as it creates it, but an early exit may have
+# left one shared; make-rprivate here is a floor, so the umount -l below can
+# never propagate to the host's own /mnt, /vendor or APEX mounts.
+for c in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
+    [ -x "$c" ] && { "$c" mount --make-rprivate "$STAGE_ROOT" 2>/dev/null; break; }
+done
+n=0
+while [ $n -lt 10 ] && grep -q " $STAGE_ROOT/" /proc/mounts; do
+    awk -v r="$STAGE_ROOT" 'index($2, r "/") == 1 {print $2}' /proc/mounts | sort -r | while read -r m; do
+        umnt -l "$m" || true
+    done
+    n=$((n + 1))
+done
+echo "Mounts left under $STAGE_ROOT: $(grep -c " $STAGE_ROOT/" /proc/mounts)"
+# The tmpfs behind guest_prepare's system_ext overlay (outside the rootfs).
+umnt -l /data/local/tmp/oneos/system_ext_ov || true
+
+# The return reboots unless ONEOS_RETURN_MODE=inplace and everything the
+# in-place return relies on is there. In place is only ever attempted with the
+# baseline of this very boot and with no stage mount or bridge left; a guest
+# shutdown request always takes the reboot path (it powers off).
+MODE=${ONEOS_RETURN_MODE:-reboot}
+if [ "$MODE" = inplace ]; then
+    RP=""
+    for c in /data/adb/ksu/bin/resetprop /data/adb/ap/bin/resetprop; do
+        [ -x "$c" ] && { RP=$c; break; }
+    done
+    why=""
+    case "$(getprop oneos.guest.powerctl)" in shutdown*) why="the guest asked to shut down" ;; esac
+    [ -n "$BB" ] || why="no busybox"
+    [ -n "$RP" ] || why="no resetprop"
+    [ -s "$BASE/apex" ] && [ -s "$BASE/props" ] && [ -s "$BASE/svcpid" ] || why="no baseline from the switch"
+    [ "$(cat "$BASE/boot_id" 2>/dev/null)" = "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)" ] || why="the baseline is from another boot"
+    grep -q '^vold [0-9]' "$BASE/svcpid" 2>/dev/null || why="One UI's vold was not found at the switch"
+    grep -q " $STAGE_ROOT/" /proc/mounts && why="stage mounts left"
+    if [ -n "$why" ]; then
+        echo "In place not possible ($why): rebooting instead."
+        MODE=reboot
+    fi
+fi
+
+# OneOS: return by rebooting unless asked otherwise. Restarting One UI in place
+# after a session left one of its decompressed APEXes unreadable every time
+# (NFC, uwb, wifi): SIGBUS crash loops, RescueParty, and once an ext4
+# errors=panic kernel panic. Temp root does not survive either way. Undo what
+# would persist (guest persist.* props; /data binds and mounts are gone above)
+# and reboot cleanly. ONEOS_RETURN_MODE=inplace: see below.
+if [ "$MODE" != inplace ]; then
+    rm -f /data/local/tmp/oneos/data/guest_audio.flag /data/local/tmp/oneos/host_audio_hal_svcs
+    STAGE=/data/local/tmp/oneos /system/bin/sh /data/local/tmp/oneos/guest_props.sh restore-persist
+    pkill -9 -f "app_storage_loop.sh" 2>/dev/null || true
+    sync
+    # A guest shutdown request (low battery, thermal, power off), recorded by the
+    # guarded ShutdownThread, becomes a real host shutdown; anything else reboots.
+    req=$(getprop oneos.guest.powerctl)
+    setprop oneos.guest.powerctl "" 2>/dev/null
+    case "$req" in
+        shutdown*)
+            echo "Guest asked to shut down ($req): powering off."
+            setprop sys.powerctl shutdown,oneos-guest-shutdown ;;
+        *)
+            echo "Rebooting into One UI (ONEOS_RETURN_MODE=inplace restarts it in place instead)."
+            setprop sys.powerctl reboot,oneos-return ;;
+    esac
+    sleep 30
+    reboot
+    exit 0
+fi
+
+# === In place: One UI's framework restarts on the same kernel boot ===========
+# What Android itself does after a system_server crash (a runtime restart: One
+# UI's SystemServer only uses mRuntimeRestart for boot metrics), with the
+# session undone first. It relies on One UI's vold having kept its
+# servicemanager name all session (the guest vold registers as "gvld", see
+# docs/inplace-return.md): vold cannot be restarted, and with its name gone One
+# UI's StorageManagerService retries "vold not found" forever. Every step is
+# logged to return_inplace.log; any check that fails ends in failsafe(), the
+# reboot return. Gates:
+#   A  after the unmounts, before any One UI program starts: One UI's APEX
+#      devices exactly as at the switch and readable below their filesystems
+#      (sysfs, LOOP_GET_STATUS64, an O_DIRECT read of each dm device, the kernel
+#      log), only busybox until it passes; then vold & co. still One UI's.
+#   B  before One UI's zygote: props and SELinux back, the services the
+#      framework waits on registered, nothing of the guest left.
+#   C  after: system_server keeps its pid until user 0 is unlocked and 30 s more.
+IPLOG=$S/return_inplace.log
+: > "$IPLOG"
+say() {
+    m="$("$BB" date +%T) $*"
+    echo "$m"; echo "$m" >> "$IPLOG"
+}
+failsafe() {
+    say "FAILSAFE: $* - rebooting into One UI instead"
+    STAGE=$S /system/bin/sh $S/guest_props.sh restore-persist >> "$IPLOG" 2>&1
+    sync
+    setprop sys.powerctl reboot,oneos-inplace-failsafe
+    sleep 20
+    # init did not reboot: the kernel's reboot, after the sync above.
+    "$BB" reboot -f
+    exit 1
+}
+base_prop() { "$BB" sed -n "s/^\[$1\]: \[\(.*\)\]\$/\1/p" "$BASE/props" | "$BB" head -n 1; }
+base_has() { "$BB" grep -q "^\[$1\]: " "$BASE/props"; }
+# Put a non-persist prop back to its value at the switch, in memory only
+# (resetprop -n: no property triggers), or delete it if One UI had none.
+put_back() {
+    if base_has "$1"; then "$RP" -n "$1" "$(base_prop "$1")" 2>/dev/null
+    else "$RP" --delete "$1" 2>/dev/null; fi
+}
+wait_found() { # <name> <seconds>
+    w=0
+    while [ $w -lt $(($2 * 2)) ]; do
+        timeout 3 service check "$1" 2>/dev/null | grep -q ': found' && return 0
+        sleep 0.5; w=$((w + 1))
+    done
+    return 1
+}
+
+# No system wakelock is held while no framework runs: keep the phone from
+# suspending in the middle of the return. Released when One UI is up.
+echo oneos_return > /sys/power/wake_lock 2>/dev/null
+say "In-place return (baseline: $(cat "$BASE/kmsg" 2>/dev/null))"
+
+echo "=== [3/4] Checking One UI's modules (in place) ==="
+# Leftovers in the host namespace. The suppression loop must be gone before
+# anything is started (its last 'ctl.stop' can land after a start); the audio
+# flag makes it stop audioserver too.
+rm -f $S/data/guest_audio.flag
+# app_storage_loop.sh runs net_fix.sh, which would add ip rule 14999 back.
+"$BB" pkill -9 -f "app_storage_loop.sh" 2>/dev/null
+"$BB" pkill -9 -f "ctl.stop zygote" 2>/dev/null
+n=0
+while [ $n -lt 10 ] && "$BB" pgrep -f "ctl.stop zygote" >/dev/null 2>&1; do
+    "$BB" pkill -9 -f "ctl.stop zygote" 2>/dev/null; sleep 0.2; n=$((n + 1))
+done
+"$BB" pgrep -f "ctl.stop zygote" >/dev/null 2>&1 && failsafe "the session's stop loop is still running"
+sleep 0.5
+# Nothing of the stage may stay mounted in any process's table (a namespace
+# made mid-session keeps its own copy): by mount point or by source (a bind
+# from the stage shows its path below /data in field 4).
+left=$("$BB" grep -H -F "/local/tmp/oneos/" /proc/[0-9]*/mountinfo 2>/dev/null |
+    "$BB" awk -v s="$S/" -v r="/local/tmp/oneos/" 'index($5, s) == 1 || index($4, r) == 1 {print $1 " " $4 " " $5}' | "$BB" head -n 3)
+[ -z "$left" ] || failsafe "stage still mounted: $left"
+# Private device nodes from sysfs maj:min for every loop and dm device the
+# return touches: guest_prepare.sh re-creates /dev/block/loop50-150 itself, so
+# a name there proves nothing.
+NODES=/dev/oneos_nodes
+"$BB" rm -rf $NODES; "$BB" mkdir -p $NODES || failsafe "no $NODES"
+node() { # <sysfs block name>: prints a node for it
+    mm=$("$BB" cat /sys/block/$1/dev 2>/dev/null) && [ -n "$mm" ] &&
+        { [ -b $NODES/$1 ] || "$BB" mknod $NODES/$1 b ${mm%%:*} ${mm#*:} 2>/dev/null; } && echo $NODES/$1
+}
+# The stage's own loop devices (system.raw and the APEX payloads,
+# guest_prepare.sh), now that nothing has them mounted. Only loops whose
+# backing file is in the stage and that nothing holds; never One UI's.
+freed=0
+for b in /sys/block/loop*; do
+    f=$("$BB" cat $b/loop/backing_file 2>/dev/null) || continue
+    case "$f" in "$S/"*) ;; *) continue ;; esac
+    [ -z "$("$BB" ls $b/holders 2>/dev/null)" ] || continue
+    nd=$(node ${b##*/}) && "$BB" losetup -d $nd 2>/dev/null && freed=$((freed + 1))
+done
+say "stage loop devices detached: $freed"
+
+# Gate A, part 1: One UI's APEX devices, without reading through any module's
+# filesystem and with busybox only (every dynamically linked program maps
+# bionic from /apex). A device whose loop stopped serving reads fails here,
+# not later as SIGBUS or an ext4 errors=panic.
+apex_state > "$S/inplace_apex.after"
+if ! "$BB" cmp -s "$BASE/apex" "$S/inplace_apex.after"; then
+    "$BB" diff "$BASE/apex" "$S/inplace_apex.after" >> "$IPLOG" 2>&1
+    failsafe "One UI's APEX devices changed during the session (diff in return_inplace.log)"
+fi
+DIRECT=0; "$BB" dd --help 2>&1 | "$BB" grep -q direct && DIRECT=1
+read_mb=0
+for d in $("$BB" awk '$1 == "dev" {print $3} $1 == "loop" {print $2}' "$BASE/apex" | "$BB" sort -u); do
+    nd=$(node $d) || failsafe "$d is gone"
+    case $d in
+        loop*) "$BB" losetup $nd >/dev/null 2>&1 || failsafe "$d no longer serves its backing file" ;;
+        dm-*)
+            [ "$("$BB" cat /sys/block/$d/dm/suspended 2>/dev/null)" = 0 ] || failsafe "$d is suspended"
+            # Every block through dm-verity and its loop, past the page cache.
+            # Never a buffered read instead: that one goes through the cache.
+            if [ $DIRECT = 1 ]; then
+                "$BB" timeout 60 "$BB" dd if=$nd of=/dev/null bs=1M iflag=direct 2>/dev/null ||
+                    failsafe "reading $d failed"
+                read_mb=$((read_mb + $("$BB" cat /sys/block/$d/size) / 2048))
+            fi ;;
+    esac
+done
+# The kernel log since the switch, for errors on exactly these devices.
+devs=$("$BB" awk '$1 == "dev" {print $3; print $2} $1 == "loop" {print $2}' "$BASE/apex" | "$BB" sort -u | "$BB" tr '\n' '|')
+mark=$(cat "$BASE/kmsg" 2>/dev/null)
+klog=$("$BB" dmesg 2>/dev/null | "$BB" awk -v m="$mark" 'm != "" && index($0, m) {f = 1; next} f || m == ""')
+"$BB" dmesg 2>/dev/null | "$BB" grep -qF "$mark" || say "kernel log: the switch's marker rotated out, scanning all of it"
+bad=$(echo "$klog" | "$BB" grep -E "(^|[[:space:](,])(${devs%|})([^0-9]|\$)" | "$BB" grep -iE 'error|corrupt|verity|capacity change' | "$BB" head -n 3)
+[ -z "$bad" ] || failsafe "kernel log: $bad"
+say "Gate A: $(grep -c '^mount ' "$BASE/apex") One UI APEX mounts as at the switch, loops serving, ${read_mb} MB read below the modules (O_DIRECT $DIRECT), kernel log clean"
+
+# Gate A, part 2: the servicemanager names One UI keeps (first dynamically
+# linked programs of the return). vold above all.
+while read -r name pid; do
+    [ "$pid" = none ] && continue
+    now=$(svc_pid "$name")
+    [ "$now" = "$pid" ] || failsafe "$name is ${now:-not registered} now, was One UI's $pid at the switch"
+done < "$BASE/svcpid"
+[ "$(getprop init.svc_debug_pid.vold)" = "$(base_prop init.svc_debug_pid.vold)" ] || failsafe "One UI's vold restarted"
+say "Gate A: vold $(awk '$1 == "vold" {print $2}' "$BASE/svcpid") and the other names are still One UI's"
+
+echo "=== [4/4] Starting One UI in place ==="
+g=0
+for p in /proc/[0-9]*; do
+    if [ -n "$GUEST_NS" ] && [ "$(readlink "$p/ns/mnt" 2>/dev/null)" = "$GUEST_NS" ]; then g=$((g + 1))
+    elif [ -n "$GUEST_DEV" ] && [ "$(stat -L -c %d "$p/root/" 2>/dev/null)" = "$GUEST_DEV" ]; then g=$((g + 1)); fi
+done
+[ $g = 0 ] || failsafe "$g guest processes still running"
+[ "$(getprop init.svc.zygote)" != running ] && ! pidof system_server >/dev/null || failsafe "One UI's zygote or system_server started before the return was ready"
+# Props before any One UI daemon reads them: the guest's own (added and
+# overridden ones), what the switch set, then persist.* from the snapshot.
+STAGE=$S /system/bin/sh $S/guest_props.sh remove >> "$IPLOG" 2>&1
+for k in ro.control_privapp_permissions sys.rescue_boot_count crashrecovery.rescue_boot_count \
+         audio.offload.disable audio.deep_buffer.media audio.offload.video vendor.audio.offload.track.enable \
+         service.bootanim.exit oneos.guest.powerctl; do
+    put_back "$k"
+done
+for k in $(getprop | "$BB" sed -n 's/^\[\(log\.tag\.[^]]*\)\]: .*/\1/p'); do put_back "$k"; done
+# debug.* (surfaceflinger, hwui, renderengine) the guest set through the shared
+# property service: One UI's surfaceflinger reads them at start.
+getprop > "$S/inplace_props.mid"
+for k in $("$BB" awk -F'\\]: \\[' 'NR == FNR {b[$1] = $2; next} $1 ~ /^\[debug\./ && (!($1 in b) || b[$1] != $2) {sub(/^\[/, "", $1); print $1}' "$BASE/props" "$S/inplace_props.mid"); do
+    put_back "$k"
+done
+STAGE=$S /system/bin/sh $S/guest_props.sh restore-persist >> "$IPLOG" 2>&1 || failsafe "One UI's persist props could not be restored"
+# RescueParty stays off until One UI is up (in memory: the stored value is the
+# snapshot's again); the guest's system_server starts counted towards it.
+"$RP" -n persist.sys.disable_rescue true 2>/dev/null
+# Every other difference to the switch's props, by name only (values can be
+# personal: SIM, operator), for the log.
+getprop > "$S/inplace_props.after"
+changed=$("$BB" awk -F'\\]: \\[' 'NR == FNR {b[$1] = $2; next} !($1 in b) || b[$1] != $2 {sub(/^\[/, "", $1); print $1}' "$BASE/props" "$S/inplace_props.after" |
+    "$BB" grep -vE '^(init\.svc|init\.svc_debug_pid|ro\.boottime|persist\.|sys\.system_server|debug\.|log\.tag|vendor\.debug)' | "$BB" tr '\n' ' ')
+say "props: restored; other changes since the switch: ${changed:-none}"
+# SELinux back before any One UI process starts (was last, after zygote).
+[ "$(cat "$BASE/selinux")" = Enforcing ] && setenforce 1 2>/dev/null
+[ "$(getenforce 2>/dev/null)" = "$(cat "$BASE/selinux")" ] || failsafe "SELinux is $(getenforce 2>/dev/null), was $(cat "$BASE/selinux")"
+
+# Session leftovers. One UI's idmap2d is lazy: stopped, it starts again on
+# request (the guest's took the "idmap" name). One UI's supplicant: its
+# HalDeviceManager starts it. net_fix.sh's rule and table.
+setprop ctl.stop idmap2d
+SUPP=$(cat $S/host_supplicant_svc 2>/dev/null)
+[ -n "$SUPP" ] && setprop ctl.stop "$SUPP"
+if ip rule show 2>/dev/null | "$BB" grep -q '^14999:.*lookup 4242'; then
+    ip rule del priority 14999 2>/dev/null
+    ip route flush table 4242 2>/dev/null
+fi
+"$BB" grep -q '^14999:' "$BASE/iprule" || ! ip rule show 2>/dev/null | "$BB" grep -q '^14999:' || say "!!! ip rule 14999 still there"
+# guest_prepare.sh re-made /dev/block/loop50-150 and /dev/loop50-150 with mknod:
+# their SELinux label is gone (One UI's apexd and vold need loop_device).
+restorecon /dev/block/loop* /dev/loop* 2>/dev/null
+# A guest vold killed in its idle maintenance leaves f2fs in urgent GC.
+[ -f "$BASE/gc_urgent" ] && while read -r f v; do
+    [ "$(cat "$f" 2>/dev/null)" = "$v" ] && continue
+    say "f2fs $f is $(cat "$f" 2>/dev/null), was $v at the switch"
+    case "$v" in 0|GC_NORMAL) echo 0 > "$f" 2>/dev/null ;; esac
+done < "$BASE/gc_urgent"
+
+# Display: the composer still holds the guest's dead surfaceflinger as its
+# client (guest_start.sh restarted it for the guest); its onrestart starts One
+# UI's surfaceflinger, which starts the boot animation.
+setprop ctl.restart vendor.qti.hardware.display.composer
+wait_found android.hardware.graphics.composer3.IComposer/default 10 || failsafe "the display composer did not come back"
+wait_found SurfaceFlinger 5 || setprop ctl.start surfaceflinger
+wait_found SurfaceFlinger 10 || failsafe "One UI's surfaceflinger did not start"
+setprop service.bootanim.exit 0
+setprop ctl.start bootanim
+say "display: composer, surfaceflinger $(pidof surfaceflinger) and boot animation up"
+
+# Audio: a fresh HAL for One UI (the guest's audioserver drove it), then One
+# UI's audioserver. AudioService waits for the policy service with no timeout.
+setprop ctl.stop audioserver
+AHAL=$(cat $S/host_audio_hal_svcs 2>/dev/null)
+for s in $AHAL; do setprop ctl.stop $s; done
+[ -n "$AHAL" ] && sleep 1
+for s in $AHAL; do setprop ctl.start $s; done
+rm -f $S/host_audio_hal_svcs
+setprop ctl.start audioserver
+wait_found media.audio_policy 20 || failsafe "One UI's audioserver did not register"
+# zygote's own onrestart list, which ctl.start skips: cameraserver, media,
+# wificond (netd follows below). The guest held the GNSS HAL's callbacks.
+setprop ctl.restart cameraserver
+for svc in media mediaextractor mediametrics; do setprop ctl.start $svc; done
+setprop ctl.restart wificond
+[ "$(base_prop init.svc.gnss_service)" = running ] && setprop ctl.restart gnss_service
+# One UI's init.zygote64.rc also restarts these two (read on the phone, run 44):
+# Samsung's perf daemon and, when it runs, the tuner service.
+for svc in perfmond media.tuner; do
+    [ "$(base_prop init.svc.$svc)" = running ] && setprop ctl.restart $svc
+done
+# The switch stopped the phone updater; init does not start it again by itself.
+[ "$(base_prop init.svc.update_engine)" = running ] && setprop ctl.start update_engine
+say "audio, camera, media, Wi-Fi, GNSS, perf and tuner services restarted"
+
+# Gate B: nothing of the guest, everything One UI's framework waits for.
+g=0
+GUEST_DEV=$(cat $S/guest_rootdev 2>/dev/null)
+[ "$GUEST_DEV" = "$HOST_DEV" ] && GUEST_DEV=""
+if [ -n "$GUEST_DEV" ]; then
+    for p in /proc/[0-9]*; do
+        [ "$(stat -L -c %d "$p/root/" 2>/dev/null)" = "$GUEST_DEV" ] && g=$((g + 1))
+    done
+fi
+[ $g = 0 ] || failsafe "$g guest processes still running"
+for name in vold SurfaceFlinger media.audio_policy media.audio_flinger installd; do
+    wait_found "$name" 5 || failsafe "$name is not registered"
+done
+for svc in vold keystore2 servicemanager hwservicemanager logd lmkd installd; do
+    [ "$(base_prop init.svc.$svc)" = running ] || continue
+    [ "$(getprop init.svc.$svc)" = running ] || failsafe "$svc is $(getprop init.svc.$svc), was running"
+done
+svcs=$(getprop | "$BB" awk -F'\\]: \\[' 'NR == FNR {b[$1] = $2; next} $1 ~ /^\[init\.svc\./ && ($1 in b) && b[$1] != $2 {sub(/^\[init\.svc\./, "", $1); print $1}' "$BASE/props" - | "$BB" tr '\n' ' ')
+say "init services not as at the switch: ${svcs:-none}"
+say "Gate B: no guest process, One UI's services up, SELinux $(getenforce)"
+
+# One UI's framework. zygote's onrestart actions by hand: abort the FUSE
+# connections the old session left. netd's restart re-creates DnsResolver
+# (the guest's system_server took its one-time unstable interface) and its
+# own onrestart starts zygote; ctl.start covers a netd without one.
+timeout 10 vdc volume abort_fuse >/dev/null 2>&1
+setprop ctl.restart netd
+n=0
+while [ $n -lt 20 ] && [ "$(getprop init.svc.zygote)" != running ]; do sleep 0.5; n=$((n + 1)); done
+[ "$(getprop init.svc.zygote)" = running ] || setprop ctl.start zygote
+say "One UI's zygote started ($(getprop init.svc.zygote))"
+
+# Gate C: system_server must come up and keep its pid until user 0 is
+# unlocked and 30 s more. Any death reboots right away: Samsung's bootchecker
+# reboots after a few anyway, and RescueParty would reset One UI's settings.
+t=0; ss=""
+while [ $t -lt 60 ]; do
+    ss=$(pidof system_server); [ -n "$ss" ] && break
+    sleep 1; t=$((t + 1))
+done
+[ -n "$ss" ] || failsafe "One UI's system_server did not start in 60 s"
+say "One UI's system_server $ss"
+t=0; up=0
+while :; do
+    sleep 2; t=$((t + 2))
+    now=$(pidof system_server)
+    [ "$now" = "$ss" ] || failsafe "One UI's system_server $ss died after ${t}s (now ${now:-none})"
+    [ "$(getprop init.svc.zygote)" = running ] || failsafe "zygote is $(getprop init.svc.zygote)"
+    if [ $up = 0 ]; then
+        st=$(timeout 5 am get-started-user-state 0 2>&1)
+        case "$st" in
+            *RUNNING_UNLOCKED*) up=$t; say "user 0 unlocked after ${t}s" ;;
+            # An am without the command: One UI's home screen process instead.
+            *nknown*|*rror*) pidof com.sec.android.app.launcher >/dev/null && { up=$t; say "One UI Home running after ${t}s"; } ;;
+        esac
+    fi
+    [ $up -gt 0 ] && [ $t -ge $((up + 30)) ] && break
+    [ $up = 0 ] && [ $t -ge 180 ] && failsafe "user 0 not unlocked within 180 s"
+done
+
+ip rule show 2>/dev/null | "$BB" diff "$BASE/iprule" - >> "$IPLOG" 2>&1 || say "!!! ip rules differ from the switch (diff in return_inplace.log)"
+# One UI is up. RescueParty back to the stored value, the modules read through
+# their filesystems (safe now: Gate A read them below), the session's logcat
+# capture and the wakelock end.
+v=$("$BB" sed -n 's/^persist\.sys\.disable_rescue=//p' $S/persist_props.snapshot 2>/dev/null | "$BB" head -n 1)
+if [ -n "$v" ]; then "$RP" -n persist.sys.disable_rescue "$v" 2>/dev/null; else "$RP" --delete persist.sys.disable_rescue 2>/dev/null; fi
+/system/bin/sh $S/check_host_apex.sh after-inplace >> "$IPLOG" 2>&1 || say "!!! a One UI APEX file read failed after the restart (see return_inplace.log)"
+# Two more minutes of the session's logcat capture for anything late.
+"$BB" sh -c 'sleep 120; pkill -f "^logcat .*/data/local/tmp/oneos_logs/boot.log"' </dev/null >/dev/null 2>&1 &
+"$BB" rm -rf $NODES
+echo "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) $(date +%s)" > $S/return_inplace.done
+echo oneos_return > /sys/power/wake_unlock 2>/dev/null
+say "One UI restored in place ($(getenforce))."

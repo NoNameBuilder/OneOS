@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the redacted bundles can be shared: the probe findings
+     (cache/findings) and the session logs (files/logs, kept until shared:
+     the cache can be cleared when storage is low). The raw probe capture,
+     the stage check's scratch folders and the app's other files are not
+     reachable. -->
+<paths>
+    <cache-path
+        name="findings"
+        path="findings/" />
+    <files-path
+        name="logs"
+        path="logs/" />
+</paths>

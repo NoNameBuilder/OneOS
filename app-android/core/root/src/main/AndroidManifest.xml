@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Package visibility for the root-manager apps OneOS looks for (no
+         QUERY_ALL_PACKAGES). Keep in sync with RootRules.MANAGER_PACKAGES.
+         com.wewaffles.onelineage is the old OneOS switcher: switching is
+         refused while it is installed (it copies its own scripts into the
+         stage every time it opens; SwitchGates.OLD_SWITCHER_PACKAGE). -->
+    <queries>
+        <package android:name="me.weishu.kernelsu" />
+        <package android:name="com.rifsxd.ksunext" />
+        <package android:name="com.sukisu.ultra" />
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="io.github.vvb2060.magisk" />
+        <package android:name="io.github.huskydg.magisk" />
+        <package android:name="me.bmax.apatch" />
+        <package android:name="com.wewaffles.onelineage" />
+    </queries>
+
+</manifest>

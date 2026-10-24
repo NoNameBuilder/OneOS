@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A card with an optional header: a title and an optional trailing status
+     ("Your phone is ready" ... "4 of 4 checks"). Content (a tile grid, rows,
+     text) is added below the header. Made by Cards.section. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/OneOS.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/oneos_section_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/oneos_section_title"
+            style="@style/OneOS.Text.Title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true" />
+
+        <TextView
+            android:id="@+id/oneos_section_trailing"
+            style="@style/OneOS.Text.Caption.Strong"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One box to tick in the Switch sheet (a Gate's ack text); the One UI
+     check box, 48dp tall or more. SwitchConfirm sets its text and tag. -->
+<CheckBox xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="48dp"
+    android:paddingStart="10dp"
+    android:textColor="?android:attr/textColorPrimary"
+    android:textSize="14sp" />

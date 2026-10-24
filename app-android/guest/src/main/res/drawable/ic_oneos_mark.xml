@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The OneOS mark (GuestReturn.dc.html), this module's own copy of
+     app/src/full's ic_oneos_mark: two rounded phones on a blue rounded
+     square. 108x108 viewport; the screen shows it at 88dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/oneos_blue"
+        android:pathData="M30,0h48a30,30 0,0 1,30,30v48a30,30 0,0 1,-30,30h-48a30,30 0,0 1,-30,-30v-48a30,30 0,0 1,30,-30z" />
+    <path
+        android:fillAlpha="0.55"
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,26h16a8,8 0,0 1,8,8v38a8,8 0,0 1,-8,8h-16a8,8 0,0 1,-8,-8v-38a8,8 0,0 1,8,-8z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,30h16a8,8 0,0 1,8,8v38a8,8 0,0 1,-8,8h-16a8,8 0,0 1,-8,-8v-38a8,8 0,0 1,8,-8z" />
+</vector>

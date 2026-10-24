@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Choose a system (SystemsActivity) and Setting up (SetupProgressActivity).
+         Fixed text never names a system: %1$s is ImageRef.name at runtime
+         (StringsNeutralSystemsTest). -->
+
+    <!-- Choose a system -->
+    <string name="systems_title">Choose a system</string>
+    <string name="systems_subtitle">Made for your %1$s. One UI stays as it is.</string>
+    <string name="systems_subtitle_unknown">One UI stays as it is.</string>
+    <string name="systems_reading">Reading this phone…</string>
+    <string name="systems_none_title">No system for this phone yet</string>
+    <string name="systems_none_line">This version of OneOS has none for this phone. Phone details, in Advanced › For the OneOS team, shows why.</string>
+    <string name="systems_chip_android">Android %1$s</string>
+    <string name="systems_chip_tested">Tested on this phone</string>
+    <string name="systems_chip_untested">Not tested on this phone yet</string>
+    <string name="systems_chip_google">Google apps</string>
+    <string name="systems_chip_download">%1$s download</string>
+    <string name="systems_badge_set_up">Set up</string>
+    <string name="systems_badge_picked">File picked</string>
+    <string name="systems_badge_setting_up">Setting up</string>
+    <string name="systems_use">Use this one</string>
+    <string name="systems_download">Download</string>
+    <string name="systems_have_file">I have the file</string>
+    <string name="systems_set_up">Set up %1$s</string>
+    <string name="systems_show_progress">Show progress</string>
+    <string name="systems_pick_other">That file is %1$s.</string>
+    <string name="systems_size_unknown_title">Check this file first</string>
+    <string name="systems_size_unknown_line">Your files app didn\'t say how big it is. Check it in Use a downloaded file; it takes a minute or two.</string>
+    <string name="systems_open_file_page">Check the file</string>
+    <string name="systems_more_title">Use a downloaded file</string>
+    <string name="systems_more_summary">Check a file, or use a system already on this phone</string>
+    <string name="systems_close">Close</string>
+
+    <!-- Setting up -->
+    <string name="setup_label">Setting up</string>
+    <string name="setup_title">Setting up %1$s</string>
+    <string name="setup_subtitle">One UI keeps working meanwhile</string>
+    <string name="setup_percent">%1$d%%</string>
+    <string name="setup_ring_desc">%1$d percent done. %2$s</string>
+    <string name="setup_eta_minutes">About %1$d min left</string>
+    <string name="setup_eta_soon">Less than a minute left</string>
+    <string name="setup_eta_estimating">Working out the time…</string>
+    <string name="setup_ring_done">Done</string>
+    <string name="setup_ring_stopped">Stopped</string>
+    <string name="setup_ring_failed">Didn\'t finish</string>
+
+    <string name="setup_step_check">Check the download</string>
+    <string name="setup_step_check_pending">Makes sure it\'s the right file for this phone</string>
+    <string name="setup_step_check_done">It\'s the right file for this phone</string>
+    <string name="setup_step_check_phone">Check this phone</string>
+    <string name="setup_step_check_phone_pending">Makes sure everything is in place</string>
+    <string name="setup_step_check_phone_done">Everything is in place</string>
+    <string name="setup_step_install">Install %1$s</string>
+    <string name="setup_step_install_generic">Install the system</string>
+    <string name="setup_step_install_pending">Copies it to this phone</string>
+    <string name="setup_step_install_done">Installed</string>
+    <string name="setup_step_finish">Finish</string>
+    <string name="setup_step_finish_pending">A last check, then it\'s ready</string>
+    <string name="setup_step_finish_done">Ready</string>
+    <string name="setup_step_bytes">%1$s of %2$s</string>
+    <string name="setup_step_stopped">Stopped here</string>
+    <string name="setup_step_failed">Didn\'t finish here</string>
+    <!-- Read by TalkBack: "Check the download, done, It's the right file for this phone". -->
+    <string name="setup_step_desc">%1$s, %2$s, %3$s</string>
+    <string name="setup_state_done">done</string>
+    <string name="setup_state_current">in progress</string>
+    <string name="setup_state_pending">not started yet</string>
+    <string name="setup_state_stopped">stopped</string>
+    <string name="setup_state_failed">didn\'t finish</string>
+
+    <string name="setup_keep_open">Keep OneOS open and your phone plugged in.</string>
+    <string name="setup_stop">Stop</string>
+    <string name="setup_stopping">Stopping…</string>
+    <string name="setup_done_title">%1$s is ready</string>
+    <string name="setup_done_subtitle">You can switch to it from the main screen.</string>
+    <string name="setup_done_button">Done</string>
+    <string name="setup_failed_title">Setup didn\'t finish</string>
+    <string name="setup_close">Close</string>
+    <string name="setup_idle_title">Nothing is being set up</string>
+    <string name="setup_idle_subtitle">Choose a system on the main screen to set one up.</string>
+
+    <string name="setup_details">Details</string>
+    <string name="setup_details_summary">Every step, for the OneOS team</string>
+    <string name="setup_details_result">What it said</string>
+    <string name="setup_details_moved">Kept as old copies</string>
+    <string name="setup_expanded">Expanded</string>
+    <string name="setup_collapsed">Collapsed</string>
+</resources>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- StatusHomeFragment on the cover screen (Main.dc.html): the hero, then the
+     cards (checks, setup progress or Welcome back's session, and the rows),
+     added to home_cards in code with Cards. The main button is the
+     activity's footer (activity_home.xml). -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/home_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/oneos_card_inset"
+        android:paddingEnd="@dimen/oneos_card_inset"
+        android:paddingBottom="16dp">
+
+        <include layout="@layout/home_hero" />
+
+        <LinearLayout
+            android:id="@+id/home_cards"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="verdict_ok">#2E7D32</color>
+    <color name="verdict_warn">#C46200</color>
+    <color name="verdict_block">#C62828</color>
+    <color name="verdict_info">#757575</color>
+</resources>

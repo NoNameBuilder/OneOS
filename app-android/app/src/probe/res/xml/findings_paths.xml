@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS Probe shares only the redacted findings in the app cache
+     (cache/findings). The raw probe capture and the app's files are not
+     reachable; it has no session logs (the full edition's paths are in
+     src/full). -->
+<paths>
+    <cache-path
+        name="findings"
+        path="findings/" />
+</paths>

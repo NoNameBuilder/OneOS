@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        android:icon="@drawable/ic_oui_error"
+        android:selectable="false"
+        android:summary="@string/before_experimental_summary"
+        android:title="@string/before_experimental_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_accounts_backup"
+        android:selectable="false"
+        android:summary="@string/before_backup_summary"
+        android:title="@string/before_backup_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_lock_outline"
+        android:selectable="false"
+        android:summary="@string/before_lock_summary"
+        android:title="@string/before_lock_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_security_outline"
+        android:selectable="false"
+        android:summary="@string/before_apps_summary"
+        android:title="@string/before_apps_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_folding_status"
+        android:selectable="false"
+        android:summary="@string/tested_scope"
+        android:title="@string/before_tested_title" />
+
+</PreferenceScreen>

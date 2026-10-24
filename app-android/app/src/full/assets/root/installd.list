@@ -1,0 +1,48 @@
+# OneOS 0.3.0: One UI's installd interface, read as root before Prepare and
+# Switch, so the app can derive this phone's installd table and compare it with
+# the table the OneOS jars carry (gate-installd).
+#
+# The same three read-only entries as the probe list (assets/probe/commands.list,
+# "installd interface"), the same runner (assets/probe/probe.sh) and the same
+# read-only audit (ProbeAudit). Root writes no file.
+
+#== installd interface
+
+#: Java class path of One UI system_server (from its environment; nothing else of it).
+run installd.classpath 10 installd/classpath.txt '
+pid=$(pidof system_server)
+[ -n "$pid" ] || exit 1
+tr "\000" "\n" < "/proc/$pid/environ" | grep -E "^(BOOTCLASSPATH|SYSTEMSERVERCLASSPATH|DEX2OATBOOTCLASSPATH)="'
+
+#: Size and SHA-256 of the jars that may define android.os.IInstalld, and the framework folder listing.
+run installd.jars 120 installd/jars.txt '
+pid=$(pidof system_server)
+[ -n "$pid" ] || exit 1
+cp=$(tr "\000" "\n" < "/proc/$pid/environ" | sed -n -E "s/^(BOOTCLASSPATH|SYSTEMSERVERCLASSPATH)=//p" | tr ":" " ")
+for j in $(printf "%s\n" $cp /system/framework/services.jar | awk "!seen[\$0]++"); do
+  [ -f "$j" ] || continue
+  printf "%s %s\n" "$(stat -c %s "$j")" "$(sha256sum "$j")"
+done
+ls -l /system/framework
+[ -d /system/framework/oat/arm64 ] || exit 0
+ls -l /system/framework/oat/arm64'
+
+#: The dex files that define android.os.IInstalld$Stub (or the whole jar if under 15 MB),
+#: from the jars in class-loader order, so the OneOS team can derive the installd table.
+files installd.dex 300 installd '
+pid=$(pidof system_server)
+[ -n "$pid" ] || exit 1
+cp=$(tr "\000" "\n" < "/proc/$pid/environ" | sed -n -E "s/^(BOOTCLASSPATH|SYSTEMSERVERCLASSPATH)=//p" | tr ":" " ")
+for j in $(printf "%s\n" $cp /system/framework/services.jar | awk "!seen[\$0]++"); do
+  [ -f "$j" ] || continue
+  for e in $(unzip -l "$j" | grep -o -E "classes[0-9]*\.dex$"); do
+    unzip -p "$j" "$e" | grep -q -F "Landroid/os/IInstalld\$Stub\$Proxy;" || continue
+    if [ "$(stat -c %s "$j")" -lt 15728640 ]; then
+      printf "%s\n" "$j"
+      break
+    fi
+    printf "%s!%s\n" "$j" "$e"
+  done
+done
+true'
+

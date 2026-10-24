@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Welcome back after a session that did not end as planned: "!" on an
+     orange disc in a light ring (the warning form of home_welcome_ok).
+     Decorative (the line under the headline says what happened). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path
+        android:fillColor="@color/oneos_tile_bg_warn"
+        android:pathData="M48,2a46,46 0,1 1,0 92a46,46 0,1 1,0 -92z" />
+    <path
+        android:fillColor="@color/oneos_warn"
+        android:pathData="M48,16a32,32 0,1 1,0 64a32,32 0,1 1,0 -64z" />
+    <path
+        android:pathData="M48,33v17"
+        android:strokeColor="@color/oneos_on_status"
+        android:strokeLineCap="round"
+        android:strokeWidth="6" />
+    <path
+        android:fillColor="@color/oneos_on_status"
+        android:pathData="M48,58.5a3.75,3.75 0,1 1,0 7.5a3.75,3.75 0,1 1,0 -7.5z" />
+</vector>

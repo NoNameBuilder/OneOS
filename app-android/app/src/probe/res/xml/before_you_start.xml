@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS Probe's Before you start: it only reads (the full edition's, with
+     backups and the screen lock, is in src/full). -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        android:icon="@drawable/ic_oui_labs_outline"
+        android:selectable="false"
+        android:summary="@string/before_probe_reads_summary"
+        android:title="@string/before_probe_reads_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_security_outline"
+        android:selectable="false"
+        android:summary="@string/before_probe_root_summary"
+        android:title="@string/before_probe_root_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_privacy"
+        android:selectable="false"
+        android:summary="@string/before_probe_privacy_summary"
+        android:title="@string/before_probe_privacy_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_file_type_zip"
+        android:selectable="false"
+        android:summary="@string/before_probe_share_summary"
+        android:title="@string/before_probe_share_title" />
+
+    <Preference
+        android:icon="@drawable/ic_oui_info_outline"
+        android:selectable="false"
+        android:summary="@string/before_probe_switch_summary"
+        android:title="@string/before_probe_switch_title" />
+
+</PreferenceScreen>

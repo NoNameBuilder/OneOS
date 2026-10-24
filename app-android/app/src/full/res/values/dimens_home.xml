@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home's hero picture (ic_oneos_hero): 236x132 on the cover, larger on the inner screen. -->
+    <dimen name="home_hero_art_width">236dp</dimen>
+    <dimen name="home_hero_art_height">132dp</dimen>
+    <!-- Welcome back's badge. -->
+    <dimen name="home_badge_size">96dp</dimen>
+</resources>

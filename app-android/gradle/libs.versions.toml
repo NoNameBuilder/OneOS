@@ -1,0 +1,31 @@
+[versions]
+# Verified together on the build server (docs/app/DESIGN.md, top and section 10).
+agp = "9.3.3"
+kotlin = "2.4.21"
+jvmToolchain = "21"
+sesl-appcompat = "1.4.0"
+sesl-material = "1.5.0"
+sesl-core = "1.3.0"
+sesl-recyclerview = "1.4.1"
+sesl-preference = "1.1.0"
+oneui-design = "1.2.6"
+oneui-icons = "1.1.0"
+junit = "4.13.2"
+# Read-only dex parsing for the installd table (DESIGN.md 6.4); Google Maven.
+smali-dexlib2 = "3.0.10"
+
+[libraries]
+sesl-appcompat = { group = "io.github.oneuiproject.sesl", name = "appcompat", version.ref = "sesl-appcompat" }
+sesl-material = { group = "io.github.oneuiproject.sesl", name = "material", version.ref = "sesl-material" }
+sesl-core = { group = "io.github.oneuiproject.sesl", name = "core", version.ref = "sesl-core" }
+sesl-recyclerview = { group = "io.github.oneuiproject.sesl", name = "recyclerview", version.ref = "sesl-recyclerview" }
+sesl-preference = { group = "io.github.oneuiproject.sesl", name = "preference", version.ref = "sesl-preference" }
+oneui-design = { group = "io.github.oneuiproject", name = "design", version.ref = "oneui-design" }
+oneui-icons = { group = "io.github.oneuiproject", name = "icons", version.ref = "oneui-icons" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+smali-dexlib2 = { group = "com.android.tools.smali", name = "smali-dexlib2", version.ref = "smali-dexlib2" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

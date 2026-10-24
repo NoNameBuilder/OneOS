@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A way-back tile in the Switch sheet: 16dp corners, a shade off the dialog surface. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/home_sheet_tile" />
+    <corners android:radius="@dimen/oneos_tile_radius" />
+</shape>

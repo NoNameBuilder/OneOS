@@ -1,0 +1,11 @@
+gpio-keys
+meta_event
+pmic_pwrkey
+pmic_resin
+certify_hall
+als_rear
+sec_vibrator_inputff
+sec_touchscreen
+sec_touchpad
+sec_touchproximity
+haechitech-digital-hall

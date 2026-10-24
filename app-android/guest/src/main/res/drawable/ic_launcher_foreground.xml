@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The OneOS icon (app/src/full): two phones, One UI in front, the guest OS
+     behind it. 108dp adaptive canvas, content inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillAlpha="0.55"
+        android:fillColor="#FFFFFF"
+        android:pathData="M57,33h13a5,5 0,0 1,5 5v32a5,5 0,0 1,-5 5h-13a5,5 0,0 1,-5 -5v-32a5,5 0,0 1,5 -5z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M39,29h15a5,5 0,0 1,5 5v40a5,5 0,0 1,-5 5h-15a5,5 0,0 1,-5 -5v-40a5,5 0,0 1,5 -5z" />
+</vector>

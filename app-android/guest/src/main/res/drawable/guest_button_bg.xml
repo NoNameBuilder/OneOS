@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Back to One UI": a filled pill (GuestReturn.dc.html, 64dp high, radius 32). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/guest_ripple_on_primary">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="32dp" />
+            <solid android:color="@color/guest_button_fill" />
+        </shape>
+    </item>
+</ripple>

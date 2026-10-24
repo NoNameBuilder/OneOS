@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The full edition (com.fahadali.oneos): the switching screens, merged
+         into src/main's manifest. The image is picked in the system file
+         picker (ACTION_OPEN_DOCUMENT, a read grant for that one file). Every
+         change on the phone is a verb of assets/root/oneos_root.sh, run as
+         root from a screen the user confirmed. -->
+    <application>
+
+        <!-- Build 2: pick and check the image, prepare the stage, switch, the last session. -->
+        <activity
+            android:name=".ui.ImageActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.PrepareActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.SwitchActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.LastSessionActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.OldStagesActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- The redesign: Choose a system (Home's "Choose a system", the fixes
+             that choose a system or a file) and Setting up (Home's "Show
+             progress", and every setup a fix starts). The labels name the
+             windows for TalkBack; their bars show no title until scrolled. -->
+        <activity
+            android:name=".ui.SystemsActivity"
+            android:exported="false"
+            android:label="@string/systems_title"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.SetupProgressActivity"
+            android:exported="false"
+            android:label="@string/setup_label"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- The redesign: Home's Advanced (cards: your system, sessions, help)
+             and its one entry For the OneOS team (the technical screens). -->
+        <activity
+            android:name=".ui.AdvancedActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.TeamActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.AdvancedActivity" />
+
+        <!-- The still OneOS screen for the black gap of a switch. Not exported:
+             oneos_switch.sh starts it as root (am start -n
+             com.fahadali.oneos/.ui.GapSplashActivity, ONEOS_SPLASH_COMPONENT)
+             and waits for its "Status: ok" before it freezes One UI's
+             surfaceflinger on it. -->
+        <activity
+            android:name=".ui.GapSplashActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboardHidden"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+    </application>
+
+</manifest>

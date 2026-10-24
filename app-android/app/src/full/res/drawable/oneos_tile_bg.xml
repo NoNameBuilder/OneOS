@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS.Tile: 16dp corners. Cards.bindCheckTile tints it for WARN and BLOCK. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/oneos_tile_bg" />
+    <corners android:radius="@dimen/oneos_tile_radius" />
+</shape>

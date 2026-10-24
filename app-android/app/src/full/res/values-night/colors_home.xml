@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark values of values/colors_home.xml. -->
+    <color name="home_text_body">#D0D0D0</color>
+    <!-- Lighter than the dark dialog (#252525), so the tiles still read as tiles. -->
+    <color name="home_sheet_tile">#30343C</color>
+    <color name="home_way_chip">#41464F</color>
+    <!-- 8:1 on the chip. -->
+    <color name="home_way_icon">#EDEDED</color>
+    <color name="home_ring_ok">#173526</color>
+</resources>

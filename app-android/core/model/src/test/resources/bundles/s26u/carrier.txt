@@ -1,0 +1,5 @@
+[gsm.operator.iso-country]: [,us]
+[gsm.sim.operator.iso-country]: [,us]
+[ro.boot.sales_code]: [ATT]
+[ro.csc.countryiso_code]: [US]
+[ro.csc.sales_code]: [ATT]

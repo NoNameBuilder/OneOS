@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The small One UI loader before a card header's "Checking…" (Home's
+     checks card while a check runs or the kept Home is shown). -->
+<androidx.appcompat.widget.SeslProgressBar xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/home_header_loader"
+    style="@style/Widget.AppCompat.ProgressBar.Small.Title"
+    android:layout_width="16dp"
+    android:layout_height="16dp"
+    android:layout_marginStart="12dp"
+    android:importantForAccessibility="no"
+    android:visibility="gone" />

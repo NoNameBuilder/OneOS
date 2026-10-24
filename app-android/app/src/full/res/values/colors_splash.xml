@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The gap splash is black in both modes (Splash.dc.html), so no night values.
+     "OS" of the wordmark is the foundation's oneos_blue_on_black. -->
+<resources>
+    <!-- "One" of the wordmark. -->
+    <color name="oneos_splash_text">#FAFAFA</color>
+    <!-- "Starting {system}": 9.9:1 on black. -->
+    <color name="oneos_splash_text_secondary">#B3B3B3</color>
+</resources>

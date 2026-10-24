@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Choose a system (SystemPicker.dc.html): a plain One UI bar with the back
+     button (the title shows there only once the hero has scrolled away),
+     and the fragment's own hero and cards. -->
+<dev.oneuiproject.oneui.layout.ToolbarLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/toolbar_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:expandable="false"
+    app:expanded="false">
+
+    <FrameLayout
+        android:id="@+id/fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</dev.oneuiproject.oneui.layout.ToolbarLayout>

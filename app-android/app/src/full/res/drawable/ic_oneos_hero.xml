@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Home hero (Main.dc.html / HomeInner.dc.html): One UI phone (blue) on
+     the left, the guest system's foldable (purple) on the right, arrows both
+     ways. 236x132 viewport; the cover screen shows it at 236x132dp, the inner
+     screen at 284x158dp. The phones keep their colours in dark mode; the
+     arrows use the text blues so they stay visible on black. Decorative:
+     give the ImageView importantForAccessibility="no". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="236dp"
+    android:height="132dp"
+    android:viewportWidth="236"
+    android:viewportHeight="132">
+
+    <!-- One UI phone -->
+    <path android:pathData="M26,8h38a12,12 0,0 1,12,12v88a12,12 0,0 1,-12,12h-38a12,12 0,0 1,-12,-12v-88a12,12 0,0 1,12,-12z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endColor="#FF1C5FD6"
+                android:endX="76"
+                android:endY="120"
+                android:startColor="#FF2F6FE0"
+                android:startX="14"
+                android:startY="8"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+    <path
+        android:fillAlpha="0.16"
+        android:fillColor="#FFFFFF"
+        android:pathData="M27,16h36a7,7 0,0 1,7,7v80a7,7 0,0 1,-7,7h-36a7,7 0,0 1,-7,-7v-80a7,7 0,0 1,7,-7z" />
+    <path
+        android:fillAlpha="0.85"
+        android:fillColor="#FFFFFF"
+        android:pathData="M30.5,26h17a2.5,2.5 0,0 1,0,5h-17a2.5,2.5 0,0 1,0,-5z" />
+    <path
+        android:fillAlpha="0.55"
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,38h24a5,5 0,0 1,5,5v4a5,5 0,0 1,-5,5h-24a5,5 0,0 1,-5,-5v-4a5,5 0,0 1,5,-5z" />
+    <path
+        android:fillAlpha="0.55"
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,57h24a5,5 0,0 1,5,5v4a5,5 0,0 1,-5,5h-24a5,5 0,0 1,-5,-5v-4a5,5 0,0 1,5,-5z" />
+
+    <!-- Guest foldable, open -->
+    <path android:pathData="M144,8h72a12,12 0,0 1,12,12v88a12,12 0,0 1,-12,12h-72a12,12 0,0 1,-12,-12v-88a12,12 0,0 1,12,-12z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endColor="#FF5B3FCB"
+                android:endX="228"
+                android:endY="120"
+                android:startColor="#FF7A5CE6"
+                android:startX="132"
+                android:startY="8"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+    <path
+        android:fillAlpha="0.16"
+        android:fillColor="#FFFFFF"
+        android:pathData="M146,16h68a7,7 0,0 1,7,7v80a7,7 0,0 1,-7,7h-68a7,7 0,0 1,-7,-7v-80a7,7 0,0 1,7,-7z" />
+    <!-- fold line -->
+    <path
+        android:pathData="M180,16V110"
+        android:strokeAlpha="0.35"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5" />
+    <path
+        android:fillAlpha="0.8"
+        android:fillColor="#FFFFFF"
+        android:pathData="M151,44a9,9 0,1 1,18 0a9,9 0,1 1,-18 0z" />
+    <path
+        android:fillAlpha="0.8"
+        android:fillColor="#FFFFFF"
+        android:pathData="M192.5,36h19a2.5,2.5 0,0 1,0,5h-19a2.5,2.5 0,0 1,0,-5z" />
+    <path
+        android:fillAlpha="0.55"
+        android:fillColor="#FFFFFF"
+        android:pathData="M192.5,46h13a2.5,2.5 0,0 1,0,5h-13a2.5,2.5 0,0 1,0,-5z" />
+
+    <!-- Arrow to the guest -->
+    <path
+        android:pathData="M86,50C100,38 112,38 124,48"
+        android:strokeColor="@color/oneos_primary_text"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+    <path
+        android:pathData="M118,44L125,49L117,53"
+        android:strokeColor="@color/oneos_primary_text"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.5" />
+
+    <!-- Arrow back to One UI -->
+    <path
+        android:pathData="M124,80C110,92 98,92 86,82"
+        android:strokeColor="@color/oneos_purple_text"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+    <path
+        android:pathData="M92,86L85,81L93,77"
+        android:strokeColor="@color/oneos_purple_text"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.5" />
+</vector>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status badge, BLOCK: a cross on a red circle (Level.BLOCK; Cards.badge). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/oneos_block"
+        android:pathData="M12,1a11,11 0,1 1,0 22a11,11 0,1 1,0 -22z" />
+    <path
+        android:pathData="M8.5,8.5L15.5,15.5M15.5,8.5L8.5,15.5"
+        android:strokeColor="@color/oneos_on_status"
+        android:strokeLineCap="round"
+        android:strokeWidth="2" />
+</vector>

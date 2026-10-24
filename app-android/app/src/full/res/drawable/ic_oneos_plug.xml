@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Setting up: the lightning bolt of "Keep OneOS open and your phone
+     plugged in" (SettingUp.dc.html). Decorative. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M13,2L4,14H11L10,22L19,10H12Z"
+        android:strokeColor="@color/oneos_icon"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.8" />
+</vector>

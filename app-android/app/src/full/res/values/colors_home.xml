@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home, the Switch sheet and Welcome back (dark values in values-night). -->
+
+    <!-- The Switch sheet's message (#3D3D3D in SwitchSheet.dc.html): 10:1 on the dialog. -->
+    <color name="home_text_body">#3D3D3D</color>
+    <!-- A way-back tile on the dialog surface (#FCFCFC light, #252525 dark). -->
+    <color name="home_sheet_tile">#F2F5FB</color>
+    <!-- The 40dp chip of a way back that is not the app, and its glyph (11:1). -->
+    <color name="home_way_chip">#E3E6EE</color>
+    <color name="home_way_icon">#2B2B2B</color>
+    <!-- The glyph on the blue chip of Back to One UI (on oneos_primary: 5.7:1 light, 4.7:1 dark). -->
+    <color name="home_way_icon_on_primary">#FFFFFF</color>
+    <!-- The ring around Welcome back's tick. -->
+    <color name="home_ring_ok">#E6F4EC</color>
+</resources>

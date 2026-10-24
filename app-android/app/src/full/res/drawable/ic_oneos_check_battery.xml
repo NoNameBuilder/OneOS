@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Check tile icon "Battery" (Main.dc.html). Line icon; Cards.bindCheckTile
+     tints it with the level colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M5,7h12a2,2 0,0 1,2,2v6a2,2 0,0 1,-2,2h-12a2,2 0,0 1,-2,-2v-6a2,2 0,0 1,2,-2z"
+        android:strokeColor="@color/oneos_ok_text"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:pathData="M21,11v2"
+        android:strokeColor="@color/oneos_ok_text"
+        android:strokeLineCap="round"
+        android:strokeWidth="2" />
+    <path
+        android:pathData="M6,10h7v4H6z"
+        android:strokeColor="@color/oneos_ok_text"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+</vector>
