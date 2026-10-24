@@ -13,6 +13,13 @@
  * Like init's "socket zygote stream 660 root system" it creates the zygote and
  * usap pool sockets, passes them as fds 3 and 4, points stdio at /dev/null and
  * closes every other fd before the exec.
+ *
+ * -Xforcejitzygote (always passed by OneLineage's launcher, and by this one up
+ * to run 44) only when ONEOS_GUEST_JIT_ZYGOTE=1, which guest_start.sh exports
+ * (1 for ColorOS guests, 0 for the others). With it ART ignores the image's
+ * AOT boot image, compiles the boot class path in memory at every zygote start
+ * (dex2oat64 --compiler-filter=verify) and runs framework code JIT-compiled
+ * only. ONEOS_GUEST_JIT_ZYGOTE itself is not passed on to zygote.
  */
 #include <fcntl.h>
 #include <stdio.h>
@@ -84,6 +91,13 @@ int main(void) {
     }
     envp[n] = NULL;
 
+    const char *jit = getenv("ONEOS_GUEST_JIT_ZYGOTE");
+    int force_jit = jit && strcmp(jit, "1") == 0;
+    /* Still on guest_start.sh's stdout and stderr (takeover.log). */
+    fprintf(stderr, "zygote_launcher: %s (ONEOS_GUEST_JIT_ZYGOTE=%s)\n",
+            force_jit ? "-Xforcejitzygote" : "the image's boot image, no -Xforcejitzygote",
+            jit ? jit : "unset");
+
     int null_fd = open("/dev/null", O_RDWR);
     if (null_fd >= 0) {
         dup3(null_fd, 0, 0);
@@ -93,10 +107,16 @@ int main(void) {
     }
     for (int fd = 5; fd < 1024; fd++) close(fd);
 
-    char *const argv[] = {
-        "zygote64", "-Xzygote", "-Xforcejitzygote", "/system/bin",
-        "--zygote", "--start-system-server", "--socket-name=zygote", NULL,
-    };
+    char *argv[8];
+    int a = 0;
+    argv[a++] = "zygote64";
+    argv[a++] = "-Xzygote";
+    if (force_jit) argv[a++] = "-Xforcejitzygote";
+    argv[a++] = "/system/bin";
+    argv[a++] = "--zygote";
+    argv[a++] = "--start-system-server";
+    argv[a++] = "--socket-name=zygote";
+    argv[a] = NULL;
     execve("/system/bin/app_process64", argv, envp);
     return 127;
 }

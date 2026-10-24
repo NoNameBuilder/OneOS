@@ -82,6 +82,76 @@ if [ "$1" = baseline ]; then
 fi
 # The return must finish even if the adb session that started it goes away.
 trap '' HUP PIPE
+# The session runs Permissive (oneos_switch.sh [1/6]). Run 46 found SELinux
+# Enforcing again by the return (who flips it is not known yet): root's
+# property writes (sys.powerctl, the persist restore), its service lookups and
+# its reboot(2) were refused, so the in-place checks failed on a false "vold is
+# not registered" and neither reboot happened (5 min black screen until a
+# forced restart). The return runs Permissive; the in-place path sets One UI's
+# own mode again at [4/4], a reboot resets it.
+SE_AT_RETURN=$(getenforce 2>/dev/null)
+if [ "$SE_AT_RETURN" != Permissive ]; then
+    setenforce 0 2>/dev/null
+    echo "SELinux was ${SE_AT_RETURN:-unreadable} at the return: Permissive again for it ($(getenforce 2>/dev/null))"
+fi
+
+# The call keepers' logs (guest_start.sh: call_audio.log, audio_keeper.log)
+# next to the session's logcat capture (oneos_switch.sh), first, before anything
+# is stopped and on both return paths. Run 44: both calls came after diag_90 and
+# the reboot return leaves no diag_final, so the per-call keeper lines were in
+# no capture. Regular files only, a copy (the stage keeps its own); nothing here
+# can fail the return.
+LOGS=/data/local/tmp/oneos_logs
+if [ -d "$LOGS" ] && [ ! -L "$LOGS" ]; then
+    for f in call_audio.log audio_keeper.log oneos_a2dp.log; do
+        [ -f "$S/data/$f" ] && [ ! -L "$S/data/$f" ] || continue
+        rm -f "$LOGS/$f" 2>/dev/null
+        cp "$S/data/$f" "$LOGS/$f" 2>/dev/null
+    done
+fi
+
+# Bluetooth and audio as the guest has them at the end, also before anything
+# is stopped (run 44: the earbuds connected minutes after diag_90 and a reboot
+# return writes no diag_final, so no capture showed the bonds, the A2DP codec
+# and offload state, HFP and SCO, or which audio module had the A2DP device).
+# The guest's own dumpsys, run in the mount namespace of its surfaceflinger
+# (or system_server) and only when that process is the guest's: read only, the
+# dumps side by side and 8 s at most each, so a hung guest holds the return up
+# 8 s at most and nothing here can fail it (whatever still runs is in the
+# guest's namespace and killed with it below). Lines that are only base64 (a
+# Bluetooth snoop summary can hold link keys) are left out. $S/diag_return:
+# oneos_switch.sh clears it at the switch; the app's log collection and
+# pull-run-logs.sh take $S/diag_*.
+DR=$S/diag_return
+GNS=$(cat "$S/guest_mntns" 2>/dev/null)
+GRD=$(cat "$S/guest_rootdev" 2>/dev/null)
+[ "$GRD" = "$(stat -L -c %d /proc/1/root/ 2>/dev/null)" ] && GRD=""
+gp=""
+for p in $(pidof surfaceflinger 2>/dev/null) $(pidof system_server 2>/dev/null); do
+    if [ -n "$GNS" ] && [ "$(readlink "/proc/$p/ns/mnt" 2>/dev/null)" = "$GNS" ]; then gp=$p; break; fi
+    if [ -n "$GRD" ] && [ "$(stat -L -c %d "/proc/$p/root/" 2>/dev/null)" = "$GRD" ]; then gp=$p; break; fi
+done
+if [ -n "$BB" ] && [ -n "$gp" ] && [ ! -L "$DR" ] && rm -rf "$DR" 2>/dev/null && mkdir -p "$DR" 2>/dev/null; then
+    gd() { timeout 8 "$BB" nsenter -t "$gp" -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys "$@" 2>&1; }
+    gd bluetooth_manager | "$BB" awk 'length($0) >= 60 && $0 ~ /^[A-Za-z0-9+\/=]+$/ { n++; next } { print } END { if (n) print "(" n " base64 lines left out)" }' > "$DR/bluetooth_manager.txt" 2>&1 &
+    p1=$!
+    gd media.audio_policy > "$DR/dumpsys_media.audio_policy.txt" 2>&1 &
+    p2=$!
+    gd audio > "$DR/dumpsys_audio.txt" 2>&1 &
+    p3=$!
+    { for k in bluetooth.sco.managed_by_audio persist.bluetooth.a2dp_offload.disabled ro.bluetooth.a2dp_offload.supported \
+               persist.bluetooth.leaudio_offload.disabled ro.bluetooth.leaudio_offload.supported; do
+          echo "$k=$(getprop "$k")"
+      done
+      echo "audio HAL pid: $(timeout 3 dumpsys --pid android.hardware.audio.core.IModule/default 2>/dev/null | head -n 1)"
+    } > "$DR/bt_props.txt" 2>&1
+    wait $p1 $p2 $p3 2>/dev/null
+    echo "Guest Bluetooth and audio at the return (pid $gp's namespace): $(ls "$DR" 2>/dev/null | tr '\n' ' ')in $DR"
+else
+    why="no guest surfaceflinger or system_server"
+    [ -n "$gp" ] && why="no busybox, or $DR not usable"
+    echo "Guest Bluetooth and audio at the return: not read ($why)"
+fi
 
 echo "=== [1/4] Terminating Container Supervision & Zygote ==="
 # A screen recording (guest_start.sh) is finalised on SIGINT; SIGKILL would
@@ -277,6 +347,11 @@ if [ "$MODE" != inplace ]; then
     esac
     sleep 30
     reboot
+    # Neither request rebooted (run 46 showed both refused under Enforcing):
+    # the kernel's reboot after a sync.
+    sleep 10
+    sync
+    "$BB" reboot -f
     exit 0
 fi
 
@@ -304,12 +379,22 @@ say() {
 }
 failsafe() {
     say "FAILSAFE: $* - rebooting into One UI instead"
+    # Permissive for the restore and the reboot requests (run 46: refused under
+    # Enforcing, the phone stayed black).
+    [ "$(getenforce 2>/dev/null)" = Permissive ] || setenforce 0 2>/dev/null
     STAGE=$S /system/bin/sh $S/guest_props.sh restore-persist >> "$IPLOG" 2>&1
     sync
     setprop sys.powerctl reboot,oneos-inplace-failsafe
     sleep 20
-    # init did not reboot: the kernel's reboot, after the sync above.
+    # init did not reboot: the kernel's reboot, after the sync above; then the
+    # kernel's own sysrq reboot as the last resort.
+    sync
     "$BB" reboot -f
+    sleep 5
+    echo 1 > /proc/sys/kernel/sysrq 2>/dev/null
+    echo s > /proc/sysrq-trigger 2>/dev/null
+    sleep 2
+    echo b > /proc/sysrq-trigger 2>/dev/null
     exit 1
 }
 base_prop() { "$BB" sed -n "s/^\[$1\]: \[\(.*\)\]\$/\1/p" "$BASE/props" | "$BB" head -n 1; }
@@ -332,7 +417,7 @@ wait_found() { # <name> <seconds>
 # No system wakelock is held while no framework runs: keep the phone from
 # suspending in the middle of the return. Released when One UI is up.
 echo oneos_return > /sys/power/wake_lock 2>/dev/null
-say "In-place return (baseline: $(cat "$BASE/kmsg" 2>/dev/null))"
+say "In-place return (baseline: $(cat "$BASE/kmsg" 2>/dev/null); SELinux at the return: ${SE_AT_RETURN:-unreadable}, now $(getenforce 2>/dev/null))"
 
 echo "=== [3/4] Checking One UI's modules (in place) ==="
 # Leftovers in the host namespace. The suppression loop must be gone before
@@ -348,6 +433,44 @@ while [ $n -lt 10 ] && "$BB" pgrep -f "ctl.stop zygote" >/dev/null 2>&1; do
 done
 "$BB" pgrep -f "ctl.stop zygote" >/dev/null 2>&1 && failsafe "the session's stop loop is still running"
 sleep 0.5
+# Stage mounts another mount namespace still holds (run 45): Android's bootstrap
+# namespace (early vendor daemons, kernel threads) gets its own copy of what the
+# session mounts below /data, and the unmounts in init's namespace do not reach
+# it: /proc/1000/mountinfo kept $S/rootfs, rootfs/proc and rootfs/sys, and the
+# check below rebooted. Unmounted in that namespace, deepest first, only mount
+# points below the stage, through one process per namespace. The check below
+# still decides.
+# Every one of them is made private there FIRST (runs 46 and 47): the copy of
+# $S/rootfs/sys is a peer of the phone's own /sys, so unmounting its submounts
+# while still shared also unmounted the real /sys/fs/selinux (getenforce
+# "Disabled", servicemanager and property checks failing, false "not
+# registered" findings, the reboot request refused). init's namespace does the
+# same with mount --make-rprivate in [2/4]. And selinuxfs is checked after.
+SEFS_BEFORE=0; [ -e /sys/fs/selinux/enforce ] && SEFS_BEFORE=1
+I_NS=$(readlink /proc/1/ns/mnt 2>/dev/null)
+seen=" "
+for p in /proc/[0-9]*; do
+    n=$(readlink "$p/ns/mnt" 2>/dev/null) || continue
+    [ -n "$n" ] && [ -n "$I_NS" ] && [ "$n" != "$I_NS" ] || continue
+    case "$seen" in *" $n "*) continue ;; esac
+    seen="$seen$n "
+    mps=$("$BB" awk -v s="$S/" 'index($5, s) == 1 {print $5}' "$p/mountinfo" 2>/dev/null | "$BB" sort -r)
+    [ -n "$mps" ] || continue
+    u=0; t=0; pv=0
+    for mp in $mps; do
+        t=$((t + 1))
+        "$BB" nsenter -t "${p##*/}" -m -- "$BB" mount --make-private "$mp" 2>/dev/null && pv=$((pv + 1))
+    done
+    if [ $pv != $t ]; then
+        say "stage mounts in another mount namespace ($n, pid ${p##*/} $(cat "$p/comm" 2>/dev/null)): only $pv of $t could be made private, none unmounted there"
+        continue
+    fi
+    for mp in $mps; do
+        "$BB" nsenter -t "${p##*/}" -m -- "$BB" umount -l "$mp" 2>/dev/null && u=$((u + 1))
+    done
+    say "stage mounts in another mount namespace ($n, pid ${p##*/} $(cat "$p/comm" 2>/dev/null)): $t made private, $u of $t unmounted there"
+done
+[ $SEFS_BEFORE = 0 ] || [ -e /sys/fs/selinux/enforce ] || failsafe "/sys/fs/selinux is gone after the stage unmounts"
 # Nothing of the stage may stay mounted in any process's table (a namespace
 # made mid-session keeps its own copy): by mount point or by source (a bind
 # from the stage shows its path below /data in field 4).
@@ -415,7 +538,10 @@ say "Gate A: $(grep -c '^mount ' "$BASE/apex") One UI APEX mounts as at the swit
 while read -r name pid; do
     [ "$pid" = none ] && continue
     now=$(svc_pid "$name")
-    [ "$now" = "$pid" ] || failsafe "$name is ${now:-not registered} now, was One UI's $pid at the switch"
+    # One retry, and what dumpsys answered in the failure (run 46: an empty
+    # answer under Enforcing read as "not registered").
+    [ "$now" = "$pid" ] || { sleep 1; now=$(svc_pid "$name"); }
+    [ "$now" = "$pid" ] || failsafe "$name is ${now:-not registered} now, was One UI's $pid at the switch (dumpsys: $(timeout 5 dumpsys --pid "$name" 2>&1 | head -n 1 | cut -c1-80); init.svc_debug_pid.vold $(getprop init.svc_debug_pid.vold); SELinux $(getenforce 2>/dev/null))"
 done < "$BASE/svcpid"
 [ "$(getprop init.svc_debug_pid.vold)" = "$(base_prop init.svc_debug_pid.vold)" ] || failsafe "One UI's vold restarted"
 say "Gate A: vold $(awk '$1 == "vold" {print $2}' "$BASE/svcpid") and the other names are still One UI's"

@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.format.DateFormat
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -450,9 +449,8 @@ class StatusHomeFragment : Fragment(R.layout.home_content) {
         }
     }
 
-    private fun selectableBackground(ctx: Context) = TypedValue().let { tv ->
-        if (ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true) && tv.resourceId != 0) ctx.getDrawable(tv.resourceId) else null
-    }
+    // The whole tile when pressed (SESL's selectableItemBackground is a small centred circle).
+    private fun selectableBackground(ctx: Context) = ctx.getDrawable(R.drawable.oneos_tile_ripple)
 
     // Setting up, Welcome back =================================================
 

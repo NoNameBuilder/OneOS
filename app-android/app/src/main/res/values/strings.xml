@@ -4,7 +4,7 @@
      overrides the root prompts and the texts that say where the results are
      kept, so they name OneOS Probe (EditionsTest checks it). -->
 <resources>
-    <string name="tested_scope">Tested only on Z Fold (F8U), with ColorOS and with Pixel.</string>
+    <string name="tested_scope">Tested on the Z Fold (F8U), S26 Ultra, S25 Ultra and S25.</string>
 
     <!-- Before you start (first launch until acknowledged; again from Home and About) -->
     <string name="before_title">Before you start</string>
@@ -103,14 +103,14 @@
     <string name="about_cat_app">OneOS</string>
     <string name="about_version_title">Version</string>
     <string name="about_what_title">What OneOS is</string>
-    <string name="about_what_summary">Runs another Android OS, built on the OneOS server from an OEM update, next to One UI on a rooted Samsung flagship, and goes back to One UI with a reboot. Nothing is flashed.</string>
+    <string name="about_what_summary">Runs another Android OS, built on the OneOS server from an OEM update, next to One UI on a rooted Samsung flagship, and goes back to One UI, usually without a restart. Nothing is flashed.</string>
     <string name="about_version_scope_title">This version</string>
     <string name="about_tested_title">Tested</string>
-    <string name="about_tested_summary">Tested only on Z Fold (F8U), with ColorOS and with Pixel. Other Galaxy Z Fold, Z Flip and S Ultra phones, and the Galaxy S25, are untested.</string>
+    <string name="about_tested_summary">Tested on the Z Fold (F8U), S26 Ultra, S25 Ultra and S25. Other phones are untested.</string>
     <string name="about_safety_title">Safety</string>
     <string name="about_cat_credits">Credits</string>
     <string name="about_credit_oneos_title">OneOS</string>
-    <string name="about_credit_oneos_summary">The app, the framework patches and the server build. The session scripts started from OneLineage\'s (below).</string>
+    <string name="about_credit_oneos_summary">The app, the framework patches and the server build. The session scripts started from the project credited below.</string>
     <string name="about_credit_onelineage_title">OneLineage</string>
     <string name="about_credit_onelineage_url" translatable="false">https://github.com/WeWaffles/OneLineage</string>
     <string name="about_no_browser">No browser found to open the link</string>

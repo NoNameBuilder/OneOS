@@ -19,7 +19,11 @@ class CompatEvaluatorTest {
         assertEquals(Level.OK, r.level("tested-model"))
         // Where it has run comes from the image table, not a fixed text.
         assertEquals("Has run on the Z Fold (F8U): ColorOS 17 · Find N6 build; Pixel 11 Fold.", r.find("tested-model")!!.detail)
-        assertEquals("Has run on: ColorOS 17 · Find N6 build on the Z Fold (F8U); Pixel 11 Fold on the Z Fold (F8U).", CompatEvaluator.TESTED_SCOPE)
+        assertEquals("Has run on: ColorOS 17 · Find N6 build on the Z Fold (F8U); Pixel 11 Fold on the Z Fold (F8U); " +
+            "ColorOS 17 · Find X9 Ultra build on the Galaxy S26 Ultra; ColorOS 17 · Find X9 Ultra build on the Galaxy S25 Ultra; " +
+            "ColorOS 17 · Find X9 Ultra build on the Galaxy S25.",
+            CompatEvaluator.TESTED_SCOPE,
+        )
         assertEquals(Level.OK, r.level("soc-snapdragon"))
         assertEquals(Level.OK, r.level("sdk-package"))
         assertEquals(Level.OK, r.level("free-space"))
@@ -83,12 +87,14 @@ class CompatEvaluatorTest {
     }
 
     @Test
-    fun s26UltraSnapdragonIsWarnNotBlock() {
-        // DESIGN.md 4.5: an S26 Ultra (Snapdragon) + ColorOS, same SDK, is WARN and runs.
+    fun s26UltraSnapdragonIsCompatible() {
+        // DESIGN.md 4.5: an S26 Ultra (Snapdragon) + ColorOS, same SDK, runs; WARN until
+        // 0.4.7, when the Find X9 Ultra build was marked tested on it.
         val r = eval(Fixtures.s26Ultra())
-        assertEquals(Verdict.WARNING, r.verdict)
-        assertEquals(Level.WARN, r.level("untested-model"))
-        assertNull(r.find("tested-model"))
+        assertEquals(Verdict.COMPATIBLE, r.verdict)
+        assertEquals(Level.OK, r.level("tested-model"))
+        assertEquals("Has run on the Galaxy S26 Ultra: ColorOS 17 · Find X9 Ultra build.", r.find("tested-model")!!.detail)
+        assertNull(r.find("untested-model"))
         assertNull(r.find("form-prefix-mismatch"))
         assertEquals(FormFactor.BAR, Fixtures.s26Ultra().form.form)
     }
@@ -126,7 +132,7 @@ class CompatEvaluatorTest {
     /**
      * Owner, 0.3.4: in scope is Z Fold / Z Flip / S Ultra or an explicit
      * profile. The friend's Galaxy S25 bundle (0.2.1-probe) was BLOCK
-     * model-out-of-scope; with its profile it is an untested WARN.
+     * model-out-of-scope; with its profile it is in scope, tested since 0.4.7.
      */
     @Test
     fun galaxyS25IsInScopeThroughItsProfile() {
@@ -138,8 +144,9 @@ class CompatEvaluatorTest {
         assertNull(r.find(CompatEvaluator.ID_OUT_OF_SCOPE))
         assertEquals(Verdict.WARNING, r.verdict)
         assertEquals(0, r.count(Level.BLOCK))
-        assertEquals(Level.WARN, r.level("untested-model"))
-        assertTrue(r.find("untested-model")!!.detail.contains("A Galaxy S25 (SM-S931B)"))
+        assertEquals(Level.OK, r.level("tested-model"))
+        assertEquals("Has run on the Galaxy S25: ColorOS 17 · Find X9 Ultra build.", r.find("tested-model")!!.detail)
+        assertNull(r.find("untested-model"))
         assertNull(r.find(CompatEvaluator.ID_NO_PROFILE))
         assertNull(r.find("profile-form-mismatch"))
         assertNull(r.find("form-prefix-mismatch"))

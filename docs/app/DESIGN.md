@@ -1334,8 +1334,8 @@ writes are in M5, only under `$STAGE`; the app's first guest boot is M7.
   deleted from the server, so its image and sets go. The Find N6 and Find X9
   Ultra images and sets are unchanged.
 - **Model.** `Images.PIXEL_YOGI` (`pixel11fold-yogi`, name "Pixel 11 Fold",
-  no variant, `OneOS_Pixel11Fold_ZFold8.img.gz` 2497335461 B, raw
-  4728029184 B, tested on the Z Fold (F8U), Google services). CPU rule from
+  no variant, `OneOS_Pixel11Fold_Full_ZFold8.img.gz` 3288346862 B, raw
+  6559223808 B, tested on the Z Fold (F8U), Google services). CPU rule from
   the image's `linker64` (disassembled): SVE and SVE2 required (unguarded in
   the loader), SME and MOPS only behind runtime checks. F8U's choices: Find
   N6 → `n6-f8u`, Pixel → `pixel-f8u`, both tested; the S Ultra profiles and

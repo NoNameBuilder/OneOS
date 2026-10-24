@@ -146,31 +146,77 @@ add)
         fi
     fi
     # Bluetooth audio offload (run 44: the earbuds connected, audio stayed on the
-    # speaker). The Pixel stack started an A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH
-    # session through the standard provider, but Samsung's QTI audio HAL only
-    # turns its A2DP offload path on through its own btaudio_offload_if.so, which
-    # only One UI's Bluetooth stack drives: on every connect it logged
-    # "handleDeviceConnectionChangebt_offload state is disabled" and dropped the
-    # BT A2DP Out port (run 44 all.log 17:32:16 to 17:36:31). With offload off the
-    # stack encodes in software and sends the audio through the HAL's bluetooth
-    # module (IModule/bluetooth); the HAL reads the prop when oneos_switch.sh
-    # restarts it for the guest, after this. Memory only, One UI's values go back
-    # with remove and restore-persist. ColorOS guests keep the host values.
-    # ONEOS_GUEST_BT_OFFLOAD=1 leaves them alone.
-    if [ "${ONEOS_GUEST_BT_OFFLOAD:-0}" = 0 ] && [ ! -f "$ROOTFS/system/framework/oplus-services.jar" ]; then
-        for k in persist.bluetooth.a2dp_offload.disabled persist.bluetooth.leaudio_offload.disabled; do
+    # speaker). A2DP keeps One UI's offload: Samsung's QTI HAL turns its offload
+    # path on from the vendor parameter l_a2dp_format, which guest_start.sh now
+    # sends (the HAL analysis: no property decides it; with offload forced off
+    # the guest policy still connected A2DP on the primary module and the
+    # bluetooth module's stream failed). LE Audio stays in software: the same
+    # HAL bit drives the LE paths, and LE ports sit on the primary module too.
+    # Memory only, One UI's value goes back with remove and restore-persist.
+    # ColorOS guests keep the host values. ONEOS_GUEST_BT_OFFLOAD=1 leaves LE alone.
+    # One guest-only prop out of the list (key, dots taken literally); 1 if the
+    # list did not have it.
+    drop_new() {
+        dk=$(printf '%s' "$1" | sed 's/[.]/\\./g')
+        grep -q "^$dk=" "$NEW" || return 1
+        sed -i "/^$dk=/d" "$NEW"
+    }
+    GUEST_OPLUS=0
+    [ -f "$ROOTFS/system/framework/oplus-services.jar" ] && GUEST_OPLUS=1
+    if [ "${ONEOS_GUEST_BT_OFFLOAD:-0}" = 0 ] && [ "$GUEST_OPLUS" = 0 ]; then
+        for k in persist.bluetooth.leaudio_offload.disabled; do
             if grep -qxF "$k" "$HOST"; then
                 hv=$(getprop "$k")
                 if [ "$hv" != true ] && "$RP" -n "$k" true 2>/dev/null; then
                     echo "$k=$hv" >> "$OVR"
-                    echo "guest_props: $k=$hv overridden to true for the session (Bluetooth audio encoded by the guest)"
+                    echo "guest_props: $k=$hv overridden to true for the session (LE Audio encoded by the guest)"
                 fi
             else
                 sed -i "/^$k=/d" "$NEW"
                 echo "$k=true" >> "$NEW"
-                echo "guest_props: $k=true for the session (Bluetooth audio encoded by the guest)"
+                echo "guest_props: $k=true for the session (LE Audio encoded by the guest)"
             fi
         done
+        # The image's other LE Audio offload props, which One UI does not define
+        # (run 44 review). ro.bluetooth.leaudio_offload.supported=true, with One
+        # UI's leaudio_offload.disabled=false, put the Pixel stack's LE Audio
+        # codec on the DSP: codec_manager.cc "configure_data_path for encode"
+        # and LE_AUDIO_HARDWARE_OFFLOAD capabilities read at 17:29:36 and
+        # 17:32:25 (run 44 all.log), the HAL offload path that refused A2DP.
+        # Left out, LE Audio stays in software even if the override above did
+        # not take. persist.bluetooth.leaudio_sw_offload and
+        # persist.vendor.audio.leaudio_sw_offload are for Pixel's own audio HAL:
+        # neither the image's Bluetooth module, framework, services nor
+        # audioserver libraries read them, nor Samsung's libaudiocorehal.qti.so,
+        # so they could only reach Samsung's audio HAL process, which is
+        # restarted after this. ONEOS_GUEST_BT_OFFLOAD=1 keeps all three.
+        out=""
+        for k in ro.bluetooth.leaudio_offload.supported persist.bluetooth.leaudio_sw_offload persist.vendor.audio.leaudio_sw_offload; do
+            drop_new "$k" && out="$out $k"
+        done
+        [ -z "$out" ] || echo "guest_props: left out for the session (undefined like One UI's: LE Audio encoded by the guest):$out"
+    fi
+    # HFP (run 44: calls routed to the earbuds stayed silent). The image's
+    # product build.prop sets bluetooth.sco.managed_by_audio=true and One UI
+    # does not define it, so it was added. With it, Pixel's Telecom,
+    # AudioService and Bluetooth stack leave opening SCO to the audio HAL:
+    # Telecom set the earbuds active and the HAL patched [Telephony Rx -> BT
+    # SCO Headset], but nobody called connectAudio, the guest audioserver only
+    # ever sent BT_SCO=off, the stack stayed in BTA_AG_SCO_LISTEN_ST and PAL
+    # logged "BT device 7 not connected or not ready" (all.log 17:34:00 to
+    # 17:34:07). Samsung's QTI HAL never opens SCO itself; One UI's stack does.
+    # Undefined (false), AudioService opens SCO through the stack and sends
+    # BT_SCO=on, which reaches the HAL as setScoConfig through the standard
+    # IBluetooth (no vendor extension needed). ColorOS guests keep the image's
+    # props. ONEOS_GUEST_SCO_MANAGED=1 keeps it.
+    SCO=bluetooth.sco.managed_by_audio
+    if [ "$GUEST_OPLUS" = 0 ]; then
+        if [ "${ONEOS_GUEST_SCO_MANAGED:-0}" = 1 ]; then
+            grep -q "^bluetooth\.sco\.managed_by_audio=" "$NEW" &&
+                echo "guest_props: $(grep "^bluetooth\.sco\.managed_by_audio=" "$NEW" | tail -n 1) kept for the session (ONEOS_GUEST_SCO_MANAGED=1: SCO left to the audio HAL)"
+        elif drop_new "$SCO"; then
+            echo "guest_props: $SCO left out for the session (undefined like One UI's: the guest's AudioService opens SCO through the Bluetooth stack)"
+        fi
     fi
     # Power key stall (run 32: the power menu ~15 s late or missing after a
     # long press, Power + Volume Down screenshots late, folds handled late).

@@ -8,8 +8,9 @@ that One UI's vold keeps its names.
 
 ## The return sequence
 
-Not tried on a phone yet. `ONEOS_RETURN_MODE=inplace` asks for it; anything else
-reboots, as before. Every step is logged to `return_inplace.log` in the stage,
+First worked on the phone in run 48 (2026-10-25: tap to user 0 unlocked in about
+50 s, same boot). Since app 0.4.7 every app session asks for it
+(`ONEOS_RETURN_MODE=inplace` in session.env); without it the return reboots. Every step is logged to `return_inplace.log` in the stage,
 and every check that fails ends in the failsafe: restore One UI's persist props,
 `sync`, `sys.powerctl reboot,oneos-inplace-failsafe`, then `busybox reboot -f`.
 
@@ -36,6 +37,11 @@ mounted and the guest asked for no shutdown. Otherwise the reboot return.
    end to end with `dd iflag=direct` (below the page cache, through
    dm-verity); the kernel log since the marker must have no error, corrupt,
    verity or capacity-change line on those devices.
+   Run 45: Android's bootstrap mount namespace (early vendor daemons, kernel
+   threads) kept its own copy of the stage mounts (`$S/rootfs`, `rootfs/proc`,
+   `rootfs/sys`), so this check rebooted. Before it, the return now unmounts
+   stage mount points in every other namespace that still has them (deepest
+   first, only below the stage) and logs the namespace and process.
 3. **Gate A, part 2.** `vold` and the other names have the pids from the
    baseline, and `init.svc_debug_pid.vold` is unchanged.
 4. **Before anything starts:** no process left in the guest's mount namespace

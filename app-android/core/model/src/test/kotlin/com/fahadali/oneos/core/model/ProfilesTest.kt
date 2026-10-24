@@ -40,27 +40,27 @@ class ProfilesTest {
         val s26 = Profiles.S_ULTRA_8850
         assertEquals(listOf("SM-S948", "m3q", "SM8850"), listOf(s26.modelPrefix, s26.codename, s26.socModel))
         assertEquals(FormFactor.BAR, s26.form)
-        // 0.3.7: only the Find X9 Ultra CN image (the IN build is gone).
+        // 0.3.7: only the Find X9 Ultra CN image (the IN build is gone); tested on the S Ultras and the S25 since 0.4.7.
         val sUltra = listOf(
-            ImageChoice("coloros17-findx9u", "x9u-sultra", tested = false),
+            ImageChoice("coloros17-findx9u", "x9u-sultra", tested = true),
         )
         assertEquals(sUltra, s26.choices)
-        assertTrue(!s26.testedWithAnyImage && s26.enabled)
+        assertTrue(s26.testedWithAnyImage && s26.enabled)
 
         val s25 = Profiles.S_ULTRA_8750
         assertEquals(listOf("SM-S938", "pa3q", "SM8750"), listOf(s25.modelPrefix, s25.codename, s25.socModel))
         assertEquals(FormFactor.BAR, s25.form)
         assertEquals(sUltra, s25.choices)
-        assertTrue(!s25.testedWithAnyImage && s25.enabled)
+        assertTrue(s25.testedWithAnyImage && s25.enabled)
 
-        // Galaxy S25 (0.3.4): the S Ultra image and set, untested, the S25 Ultra's notes.
+        // Galaxy S25 (0.3.4): the S Ultra image and set (tested since 0.4.7), the S25 Ultra's notes.
         val s25Base = Profiles.S_8750
         assertEquals("s-8750", s25Base.id)
         assertEquals("Galaxy S25", s25Base.label)
         assertEquals(listOf("SM-S931", "pa1q", "SM8750"), listOf(s25Base.modelPrefix, s25Base.codename, s25Base.socModel))
         assertEquals(FormFactor.BAR, s25Base.form)
         assertEquals(sUltra, s25Base.choices)
-        assertTrue(!s25Base.testedWithAnyImage && s25Base.enabled)
+        assertTrue(s25Base.testedWithAnyImage && s25Base.enabled)
         assertEquals(s25.notes, s25Base.notes)
         assertEquals(listOf("profile-vendor-older"), s25Base.notes.map { it.id })
         assertEquals(listOf(Profiles.F8U, Profiles.S_ULTRA_8850, Profiles.S_ULTRA_8750, Profiles.S_8750), Profiles.BUILT_IN)

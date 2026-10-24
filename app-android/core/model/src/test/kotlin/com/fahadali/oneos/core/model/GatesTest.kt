@@ -37,32 +37,32 @@ class GatesTest {
     private fun GateReport.level(id: String): Level? = find(id)?.level
 
     @Test
-    fun s26UltraSwitchNeedsTwoTicks() {
+    fun s26UltraSwitchNeedsTheCarrierTick() {
         val r = eval(GatePhase.SWITCH, input(Bundles.S26U))
         assertEquals(Profiles.S_ULTRA_8850, r.profile)
         assertEquals(Images.FIND_X9U, r.image)
         assertEquals(PackageSets.X9U_SULTRA, r.set)
         assertFalse(r.blocked)
-        assertEquals(listOf(SwitchGates.ID_PROFILE, SwitchGates.ID_CARRIER), r.toTick.map { it.id })
+        // The Find X9 Ultra build is tested on it since 0.4.7: only the carrier tick.
+        assertEquals(listOf(SwitchGates.ID_CARRIER), r.toTick.map { it.id })
         // The ticks name the system: "ColorOS 17", the S Ultra's only ColorOS 17 build since 0.3.7 (with the
         // IN build it was "ColorOS 17 · Find X9 Ultra build").
         val system = Images.systemName(Images.FIND_X9U, Profiles.S_ULTRA_8850)
         assertEquals("ColorOS 17", system)
         assertEquals(CarrierRules.noCallsAck(system), r.find(SwitchGates.ID_CARRIER)!!.ack)
         assertEquals("I understand phone calls, including emergency calls, won't work in $system", r.find(SwitchGates.ID_CARRIER)!!.ack)
-        assertEquals(SwitchGates.untestedAck(Profiles.S_ULTRA_8850, Images.FIND_X9U), r.find(SwitchGates.ID_PROFILE)!!.ack)
+        assertNull(r.find(SwitchGates.ID_PROFILE)!!.ack)
 
         val keys = r.toTick.mapNotNull { it.tickKey }.toSet()
         assertTrue(r.allows(keys))
         assertFalse(r.allows(emptySet()))
-        assertFalse(r.allows(setOf(r.find(SwitchGates.ID_PROFILE)!!.tickKey!!)))
         // A tick for another text does not count.
         assertFalse(r.allows(keys - r.find(SwitchGates.ID_CARRIER)!!.tickKey!! + "${SwitchGates.ID_CARRIER}|${CarrierRules.maybeCallsAck(system)}"))
 
         for (id in listOf(
             SwitchGates.ID_ROOT, SwitchGates.ID_ANDROID, SwitchGates.ID_FORM, SwitchGates.ID_IMAGE, SwitchGates.ID_INSTALLD,
             SwitchGates.ID_OLD_SWITCHER, SwitchGates.ID_STAGE, SwitchGates.ID_SPACE, SwitchGates.ID_SCREEN_LOCK,
-            SwitchGates.ID_BATTERY,
+            SwitchGates.ID_BATTERY, SwitchGates.ID_PROFILE,
         )) {
             assertEquals(id, Level.OK, r.level(id))
         }
@@ -86,16 +86,16 @@ class GatesTest {
         val r = eval(GatePhase.SWITCH, input(Bundles.S25U))
         assertEquals(Profiles.S_ULTRA_8750, r.profile)
         assertFalse(r.blocked)
-        assertEquals(SwitchGates.untestedAck(Profiles.S_ULTRA_8750, r.image), r.find(SwitchGates.ID_PROFILE)!!.ack)
+        assertEquals(Level.OK, r.level(SwitchGates.ID_PROFILE))
+        assertNull(r.find(SwitchGates.ID_PROFILE)!!.ack)
         assertTrue(r.allows(r.toTick.mapNotNull { it.tickKey }.toSet()))
-        assertFalse(r.allows(emptySet()))
         // Its real CPU (no SVE/SME): the X9U image does not need them; some OPPO features may crash.
         assertEquals(Level.WARN, r.level(CpuRules.ID_APP_FEATURES))
         assertEquals(Level.WARN, r.level("profile-vendor-older"))
         assertFalse(eval(GatePhase.PREPARE, input(Bundles.S25U)).blocked)
     }
 
-    /** Galaxy S25 (0.3.4): the S25 Ultra's gates, ticks and notes, its own profile id. */
+    /** Galaxy S25 (0.3.4): the S25 Ultra's gates and notes, its own profile id; tested since 0.4.7, so no profile tick. */
     @Test
     fun galaxyS25SwitchNeedsItsTicks() {
         val r = eval(GatePhase.SWITCH, input(Bundles.S25))
@@ -103,11 +103,9 @@ class GatesTest {
         assertEquals(Images.FIND_X9U, r.image)
         assertEquals(PackageSets.X9U_SULTRA, r.set)
         assertFalse(r.blocked)
-        assertEquals(listOf(SwitchGates.ID_PROFILE), r.toTick.map { it.id })
-        assertEquals(SwitchGates.untestedAck(Profiles.S_8750, Images.FIND_X9U), r.find(SwitchGates.ID_PROFILE)!!.ack)
-        assertEquals("I understand this phone hasn't run ColorOS 17 before", r.find(SwitchGates.ID_PROFILE)!!.ack)
-        assertTrue(r.allows(r.toTick.mapNotNull { it.tickKey }.toSet()))
-        assertFalse(r.allows(emptySet()))
+        assertTrue(r.toTick.isEmpty())
+        assertEquals(Level.OK, r.level(SwitchGates.ID_PROFILE))
+        assertTrue(r.allows(emptySet()))
         assertEquals(Level.OK, r.level(SwitchGates.ID_FORM))
         assertEquals(Level.OK, r.level(SwitchGates.ID_INSTALLD))
         assertEquals(Level.WARN, r.level(CpuRules.ID_APP_FEATURES))
@@ -254,7 +252,7 @@ class GatesTest {
         val r = eval(GatePhase.PREPARE, i)
         assertTrue(r.toTick.isEmpty())
         assertEquals(Level.WARN, r.level(SwitchGates.ID_CARRIER))
-        assertEquals(Level.WARN, r.level(SwitchGates.ID_PROFILE))
+        assertEquals(Level.OK, r.level(SwitchGates.ID_PROFILE))
         assertNull(r.find(SwitchGates.ID_BATTERY))
         assertFalse(r.blocked)
     }
@@ -420,7 +418,7 @@ class GatesTest {
         assertTrue(SwitchGates.evaluate(GatePhase.SWITCH, input(Bundles.F8U), profiles).allows(emptySet()))
     }
 
-    /** The S Ultra profiles take the Find X9 Ultra (CN) build, not tested: a tick naming the build (0.3.3-0.3.6: the IN build too). */
+    /** The S Ultra profiles and the S25 take the Find X9 Ultra (CN) build, tested on them since 0.4.7 (0.3.3-0.3.6: the IN build too; until 0.4.7 an untested tick). */
     @Test
     fun sUltraTakesTheX9UltraBuild() {
         for ((phone, p) in listOf(Bundles.S26U to Profiles.S_ULTRA_8850, Bundles.S25U to Profiles.S_ULTRA_8750, Bundles.S25 to Profiles.S_8750)) {
@@ -431,12 +429,9 @@ class GatesTest {
                     assertEquals("${p.id} ${image.id} $phase", image, r.image)
                     assertEquals(set, r.set)
                     assertFalse(r.blocked)
-                    assertEquals(Level.WARN, r.level(SwitchGates.ID_PROFILE))
+                    assertEquals(Level.OK, r.level(SwitchGates.ID_PROFILE))
                 }
-                val ack = eval(GatePhase.SWITCH, input(phone, image = image)).find(SwitchGates.ID_PROFILE)!!.ack
-                assertEquals(SwitchGates.untestedAck(p, image), ack)
-                // One ColorOS 17 build on the phone: its name without the variant.
-                assertEquals("I understand this phone hasn't run ColorOS 17 before", ack)
+                assertNull(eval(GatePhase.SWITCH, input(phone, image = image)).find(SwitchGates.ID_PROFILE)!!.ack)
             }
         }
         // The CPU rule comes with the image: the CN build needs nothing beyond arm64 (its apps WARN on the
@@ -467,7 +462,7 @@ class GatesTest {
         // Nothing picked: the BLOCK says what the phone takes.
         val none = eval(GatePhase.PREPARE, input(Bundles.F8U).copy(imageFile = null))
         assertEquals("Pick the image first", none.find(SwitchGates.ID_IMAGE)!!.finding.title)
-        assertTrue(none.find(SwitchGates.ID_IMAGE)!!.finding.detail.contains("OneOS_Pixel11Fold_ZFold8.img.gz"))
+        assertTrue(none.find(SwitchGates.ID_IMAGE)!!.finding.detail.contains("OneOS_Pixel11Fold_Full_ZFold8.img.gz"))
         // SWITCH: a stage holding the CN image on the Fold.
         val cn = eval(GatePhase.SWITCH, input(Bundles.F8U).copy(stage = stage(Profiles.F8U, Images.ID_FIND_X9U, set = PackageSets.ID_X9U_SULTRA)))
         assertEquals(Level.BLOCK, cn.level(SwitchGates.ID_IMAGE))
@@ -509,7 +504,7 @@ class GatesTest {
         val cn = input(Bundles.S26U, image = Images.FIND_X9U).copy(freeBytes = cnNeed)
         assertEquals(Level.OK, eval(GatePhase.PREPARE, cn).level(SwitchGates.ID_SPACE))
         assertEquals(Level.BLOCK, eval(GatePhase.PREPARE, cn.copy(freeBytes = cnNeed - 1)).level(SwitchGates.ID_SPACE))
-        // On the Fold: the Pixel image is half the Find N6's size, with a bigger set; each needs its own.
+        // On the Fold: the Pixel image is smaller than the Find N6 one, with a bigger set; each needs its own.
         val n6Need = SpaceRule.toStage(Images.FIND_N6, PackageSets.N6_F8U)
         val pixelNeed = SpaceRule.toStage(Images.PIXEL_YOGI, PackageSets.PIXEL_F8U)
         assertTrue(pixelNeed < n6Need)
@@ -521,7 +516,7 @@ class GatesTest {
         assertEquals(Level.OK, eval(GatePhase.PREPARE, n6.copy(freeBytes = n6Need)).level(SwitchGates.ID_SPACE))
         val short = eval(GatePhase.PREPARE, pixel.copy(freeBytes = pixelNeed - 1))
         assertEquals(Level.BLOCK, short.level(SwitchGates.ID_SPACE))
-        assertTrue(short.find(SwitchGates.ID_SPACE)!!.finding.detail.contains("the Pixel 11 Fold image 4.7 GB"))
+        assertTrue(short.find(SwitchGates.ID_SPACE)!!.finding.detail.contains("the Pixel 11 Fold image 6.6 GB"))
         // No image picked yet: no space figure (the image gate BLOCKs).
         assertNull(eval(GatePhase.PREPARE, cn.copy(imageFile = null)).find(SwitchGates.ID_SPACE))
     }

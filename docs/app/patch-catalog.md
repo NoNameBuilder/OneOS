@@ -340,7 +340,7 @@ other phones and guests.
 | `core.hide_host_apex_apps` | Avoid duplicate system apps: hide host nfcservices/bt APEX `app` dirs when the guest has no payload for them | guest lacks that payload | auto / locked | `mp:1210-1228` | stage | Google vs OPPO signature clash | |
 | `core.networkstack_group` | One signer for networking: keep host tethering; bind host `NetworkStackGoogle` and `CaptivePortalLoginGoogle`; hide guest CellBroadcastService | guest NetworkStack signer differs from host tethering | auto / locked | `mp:1147-1152,1230-1244` | stage | `map_netd_uid_permission_map` missing; shared-user mismatch | NetworkStatsService crash |
 | `core.guest_classpath` | Guest's own class paths: `derive_classpath` plus `/data/oneos_genv.sh` for nsenter commands | always | on / locked | `mi:86-119` | inner | `OplusBitmapChecker` zygote abort | |
-| `core.zygote_launcher` | Start the guest zygote: static launcher with sockets, passes the env | always | on / locked | `switcher/native/zygote_launcher.c`; `mi:613-617` | inner | OneLineage hardcoded Lineage paths | |
+| `core.zygote_launcher` | Start the guest zygote: static launcher with sockets, passes the env; `-Xforcejitzygote` only with `ONEOS_GUEST_JIT_ZYGOTE=1` (default 1 for ColorOS, 0 otherwise: the image's own boot image, accepted by ART only when `/apex/apex-info-list.xml` lists the image's ART and i18n modules as factory) | always | on / locked | `switcher/native/zygote_launcher.c`; `mi:613-617` | inner | OneLineage hardcoded Lineage paths | |
 | `core.stop_host_framework` | Pause One UI: stop zygote and surfaceflinger, kill system_server, keep them stopped in a loop | always | on / locked | `sw:290-336` | stage | One UI apps lost their APKs when stopped later | |
 | `core.selinux_permissive` | Permissive SELinux for the session; enforcing again on return | always | on / locked | `sw:72-81`; `ret:232-234` | stage | MAC denials inside system_server | a phone left permissive if the return fails (a reboot resets it) |
 | `core.rescue_party_off` | No RescueParty during the session: `persist.sys.disable_rescue`, `sys.rescue_boot_count=0` | always | on / locked | `sw:200-203` | stage | | removed again by restore-persist |
@@ -462,7 +462,7 @@ every guest today; in the app they must be limited to the families listed.
 
 | id | Title: description | Default / toggle | Today | App stage | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `diag.logcat_capture` | Session log: logcat -b all, 20 MB x 10, previous session kept | on / advanced (`ONEOS_LOGCAT`) | `sw:25-43` | stage | feeds the failure bundle; off means reports have no logs |
+| `diag.logcat_capture` | Session log: logcat -b all, 32 MB x 25, the boot kept in head/ (hard links), previous session kept | on / advanced (`ONEOS_LOGCAT`) | `sw:25-43` | stage | feeds the failure bundle; off means reports have no logs |
 | `diag.log_bundle` | Share logs: after a failed session or reboot, pack the capture, `*.log`, `diag_*`, inner log, `call_audio.log`, activator log | on / locked (sharing is the user's choice) | `scripts/pull-run-logs.sh` | return + next app start | redact before sharing (§9) |
 | `diag.host_snapshot` | Host device states, layouts, port associations, touch nodes | on / locked | `sw:345-370` | stage | |
 | `diag.display_rounds` | Display and state dumps at 20, 40, 90 s and final; since run 44 also thermal and CPU/GPU clocks every round, and from 40 s, in the background: density and fold line, composition, dexopt, frame pacing, Comfort View, phone process and RIL props (identifiers left out), call audio route | on / advanced | `sw:845-911` | watcher | heavy (debuggerd, getevent 15 s) |
@@ -612,6 +612,7 @@ Meanwhile the `lineage.*` entries, which run for ColorOS today, should stop doin
 | `ONEOS_GUEST_RINGTONES` (1) | coloros.haptic_ringtones, core.default_sound_props | toggle |
 | `ONEOS_RECORD` (0) | diag.screen_record | toggle |
 | `ONEOS_GUEST_HWC` (0 for ColorOS, 1 otherwise) | samsung.force_gpu_composition (inverted) | advanced |
+| `ONEOS_GUEST_JIT_ZYGOTE` (1 for ColorOS, 0 otherwise) | core.zygote_launcher (`-Xforcejitzygote`; not in session.env) | dev |
 | `ONEOS_GUEST_DENSITY` (auto) | fold.guest_density | toggle |
 | `ONEOS_GUEST_POSTURE` (flat) | fold.display_features | advanced |
 | `ONEOS_WIFI_VERBOSE` (0) | diag.wifi_verbose | dev |

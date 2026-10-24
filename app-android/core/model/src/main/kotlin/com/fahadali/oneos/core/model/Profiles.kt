@@ -88,13 +88,14 @@ object Profiles {
     const val R_OLDER_VENDOR = "older-vendor"
 
     /**
-     * Both S Ultra profiles and the Galaxy S25: the Find X9 Ultra CN build, not
-     * tested yet (0.3.3-0.3.6 also took the IN build, gone in 0.3.7). The set is
+     * Both S Ultra profiles and the Galaxy S25: the Find X9 Ultra CN build,
+     * tested on all three (owner, 2026-10-25; 0.3.3-0.3.6 also took the IN build,
+     * gone in 0.3.7). The set is
      * named for the S Ultra but holds nothing per phone beyond the bar form (no
      * fold grid).
      */
     private val S_ULTRA_CHOICES = listOf(
-        ImageChoice(Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, tested = false),
+        ImageChoice(Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, tested = true),
     )
 
     /** The SM8750 phones (S25 Ultra, S25): vendor API 202404 and kernel 6.6. */

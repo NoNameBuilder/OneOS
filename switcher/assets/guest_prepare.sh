@@ -1359,18 +1359,40 @@ fi
 # passes unchanged. If the filter or the check after it fails, the guest starts
 # with no pairings (the stage's bt_config.conf and .bak deleted): never an
 # unchecked copy, and never run 43's stage file (One UI's bad PID data plus the
-# guest's own key for the earbuds). ONEOS_GUEST_BT_LE_SANITIZE=0 imports One UI's file
-# unchanged. diag_bt/ gets the shape of One UI's file and of the guest's
-# previous one (BT_SHAPE_AWK: key names, value lengths, hex or not, small type
-# values, where the device's own address sits in LE_KEY_PID), never a key value
-# or a full address. Run 43 also had the imported link key rejected
-# (HCI_ERR_AUTH_FAILURE at the earbuds' first connection); the earbuds then asked
-# to pair again and the guest's stack auto-accepted it, which replaced their key
-# for this phone and broke One UI's pairing. Never pair One UI's devices in the
-# guest (docs/pixel-guest.md).
+# guest's own key for the earbuds). ONEOS_GUEST_BT_LE_SANITIZE=0 skips the LE part (since
+# run 44 the link key check below still runs). diag_bt/ gets the shape of One
+# UI's file and of the guest's previous one (BT_SHAPE_AWK: key names, value
+# lengths, hex or not, small type values, where the device's own address sits
+# in LE_KEY_PID), never a key value or a full address. Run 43 also had the
+# imported link key rejected (HCI_ERR_AUTH_FAILURE at the earbuds' first
+# connection); the earbuds then asked to pair again and the guest's stack
+# auto-accepted it, which replaced their key for this phone and broke One UI's
+# pairing. Never pair One UI's devices in the guest (docs/pixel-guest.md).
+# Run 44: One UI's link keys are not AOSP's. diag_bt/shape_oneui.txt has
+# LinkKey len=64 hex (32 bytes) for both BR/EDR devices, and One UI's LE keys
+# are 64 hex too; the Pixel stack's own (shape_guest_prev.txt) is 32 hex (16
+# bytes). The stack found no usable key: HCI_ERR_AUTH_FAILURE, "Bond loss
+# detected ... KEY_MISSING", autonomous re-pairing, three pairing dialogs, and
+# a CsipSetCoordinatorService.bondStateChanged NPE that took the Bluetooth
+# process down (17:32:08 to 17:35:21); the earbuds now hold a guest key and
+# need pairing again in One UI. So the import is off by default
+# (ONEOS_GUEST_BT_IMPORT=1 turns it on), and BT_SAN_AWK drops every device
+# whose LinkKey is not exactly 32 hex chars, whichever file it reads: the
+# stage's own file kept One UI's imported records with their 64-hex keys
+# across the guest's own saves (run 43's, shape_guest_prev.txt device 1), and
+# such a record goes through the same KEY_MISSING and re-pairing as soon as
+# that device connects. A key the Pixel stack wrote is always 32 hex, so the
+# guest's own pairings stay as they are.
 BTC=/data/misc/bluedroid/bt_config.conf
 BTD="$STAGE/data/misc/bluedroid"
 BTDIAG="$STAGE/diag_bt"
+# Every guest: the stage's folder and file are never One UI's own (a hard link
+# of the file, or the folder reached another way than the checks at the top
+# refuse). Nothing below, and no guest stack, may write to them.
+if [ "$BTD" -ef /data/misc/bluedroid ] || { [ -e "$BTC" ] && [ "$BTD/bt_config.conf" -ef "$BTC" ]; }; then
+    echo "ERROR: ${BTD#$STAGE/} or its bt_config.conf is One UI's own Bluetooth config; not starting the guest"
+    exit 3
+fi
 rm -rf "$BTDIAG"
 # Shared by both filters. A device section is [xx:xx:xx:xx:xx:xx] (written out:
 # mawk and older busybox awk have no {n}).
@@ -1396,18 +1418,27 @@ function name(k) { return (k ~ /^[A-Za-z_][A-Za-z0-9_]*$/ && length(k) <= 48 && 
     printf "  %s len=%d %s%s\n", name(k), length(v), x, e
     next }
 /[^ \t\r]/ { print "  (line without =, " length($0) " chars)" }'
-# One UI's file is read once and kept in memory. bad = devices whose
-# LE_KEY_PID is not 23 bytes (IRK, type 00/01, the device's own address); with
-# any, every device loses its LE records, LE-only devices are dropped and
-# dual-mode ones become BR/EDR. The summary line goes to SUM.
+# One UI's file is read once and kept in memory. A device whose LinkKey is not
+# 32 hex chars (16 bytes, AOSP's form; One UI writes 64) is dropped whole (run
+# 44), always. bad = devices whose LE_KEY_PID is not 23 bytes (IRK, type
+# 00/01, the device's own address); with any, every device loses its LE
+# records, LE-only devices are dropped and dual-mode ones become BR/EDR. A
+# device dropped for its link key does not count: in the stage's own file
+# those are One UI's leftovers (run 43's device 1 had a bad PID too), and they
+# must not strip the LE keys of the pairings the guest made itself. LE=0
+# (ONEOS_GUEST_BT_LE_SANITIZE=0) skips the LE part. The summary line goes to SUM.
 BT_SAN_AWK='{ L[NR] = $0 }
 /^\[/ { sec = $0; dev = isdev(sec); if (dev) ndev++; next }
-dev && /^LE_KEY_PID[ \t]*=/ { p = tolower(val($0)); t = substr(p, 33, 2)
-    if (length(p) != 46 || p ~ /[^0-9a-f]/ || (t != "00" && t != "01") || substr(p, 35, 12) != hex(sec)) bad++ }
+dev && LE == 1 && /^LE_KEY_PID[ \t]*=/ { p = tolower(val($0)); t = substr(p, 33, 2)
+    if (length(p) != 46 || p ~ /[^0-9a-f]/ || (t != "00" && t != "01") || substr(p, 35, 12) != hex(sec)) badpid[sec] = 1 }
 dev && /^DevType[ \t]*=/ && val($0) == "2" { leonly[sec] = 1 }
-END { sec = ""; dev = 0; drop = 0
+dev && /^LinkKey[ \t]*=/ { lk = val($0); if (length(lk) != 32 || lk ~ /[^0-9A-Fa-f]/) badkey[sec] = 1 }
+END { bad = 0; for (s in badpid) if (!(s in badkey)) bad++
+    sec = ""; dev = 0; drop = 0
     for (i = 1; i <= NR; i++) { l = L[i]
-        if (l ~ /^\[/) { sec = l; dev = isdev(sec); drop = (bad && dev && (sec in leonly)); if (drop) gone++ }
+        if (l ~ /^\[/) { sec = l; dev = isdev(sec); drop = 0
+            if (dev && (sec in badkey)) { drop = 1; keygone++ }
+            else if (bad && dev && (sec in leonly)) { drop = 1; gone++ } }
         if (drop) continue
         if (bad && dev && l !~ /^\[/) {
             k = key(l)
@@ -1416,20 +1447,19 @@ END { sec = ""; dev = 0; drop = 0
         }
         print l }
     n = 0; for (s in cut) n++
-    printf "%d devices, %d LE_KEY_PID not in the guest layout: LE records removed from %d, %d LE-only dropped\n", ndev, bad, n, gone > SUM }'
+    printf "%d devices, %d with a LinkKey not in AOSP form (32 hex) dropped, ", ndev, keygone > SUM
+    if (LE == 1) printf "%d LE_KEY_PID not in the guest layout: LE records removed from %d, %d LE-only dropped\n", bad, n, gone > SUM
+    else printf "LE check off (ONEOS_GUEST_BT_LE_SANITIZE=0)\n" > SUM }'
 # The stage's bt_config.conf from $1 (One UI's file, or the stage's own) through
-# BT_SAN_AWK, or as it is with ONEOS_GUEST_BT_LE_SANITIZE=0 (anything but 0
-# keeps the check), via a temp file. A failure, or no [Adapter] in the result,
-# deletes the stage's file and .bak: no pairings, never an unchecked file.
+# BT_SAN_AWK, via a temp file: the link key check always, the LE check unless
+# ONEOS_GUEST_BT_LE_SANITIZE=0. A failure, or no [Adapter] in the result,
+# deletes the stage's file and .bak: no pairings, never an unchecked file. Only
+# the stage's folder is written; $1 is only read.
 bt_stage_conf() {
     rm -f "$BTD/bt_config.conf.oneos-new" "$BTD/bt_config.bak"
-    bt_ok=0
-    if [ "${ONEOS_GUEST_BT_LE_SANITIZE:-1}" != 0 ]; then
-        $BB awk -v SUM="$BTDIAG/sanitize.txt" "$BT_AWK_FN$BT_SAN_AWK" "$1" > "$BTD/bt_config.conf.oneos-new" && bt_ok=1
-    else
-        cp "$1" "$BTD/bt_config.conf.oneos-new" && bt_ok=1
-    fi
-    if [ $bt_ok = 1 ] && grep -q '^\[Adapter\]' "$BTD/bt_config.conf.oneos-new" &&
+    bt_le=1; [ "${ONEOS_GUEST_BT_LE_SANITIZE:-1}" = 0 ] && bt_le=0
+    if $BB awk -v SUM="$BTDIAG/sanitize.txt" -v LE="$bt_le" "$BT_AWK_FN$BT_SAN_AWK" "$1" > "$BTD/bt_config.conf.oneos-new" &&
+       grep -q '^\[Adapter\]' "$BTD/bt_config.conf.oneos-new" &&
        chown 1002:1002 "$BTD/bt_config.conf.oneos-new" && chmod 0660 "$BTD/bt_config.conf.oneos-new" &&
        mv -f "$BTD/bt_config.conf.oneos-new" "$BTD/bt_config.conf"; then
         $BB chcon u:object_r:bluetooth_data_file:s0 "$BTD/bt_config.conf" 2>/dev/null || true
@@ -1438,11 +1468,12 @@ bt_stage_conf() {
     rm -f "$BTD/bt_config.conf.oneos-new" "$BTD/bt_config.conf" "$BTD/bt_config.bak"
     return 1
 }
+# Run 44: no import unless ONEOS_GUEST_BT_IMPORT=1 (see above).
 bt_own=0
 if [ "$GUEST_OPLUS" = 1 ]; then
     :
-elif [ "${ONEOS_GUEST_BT_IMPORT:-1}" != 1 ]; then
-    echo "Guest Bluetooth pairings: the guest's own (ONEOS_GUEST_BT_IMPORT=0)"
+elif [ "${ONEOS_GUEST_BT_IMPORT:-0}" != 1 ]; then
+    echo "Guest Bluetooth pairings: the guest's own; One UI's are not imported (its link keys are not in AOSP form; ONEOS_GUEST_BT_IMPORT=1 imports them)"
     bt_own=1
 elif [ -L /data/misc/bluedroid ] || [ -L "$BTC" ] || [ ! -f "$BTC" ]; then
     echo "Guest Bluetooth pairings: One UI's bt_config.conf is missing or not a regular file; the guest's own stays"
@@ -1456,29 +1487,42 @@ else
     fi
     $BB awk "$BT_AWK_FN$BT_SHAPE_AWK" "$BTC" > "$BTDIAG/shape_oneui.txt" 2>&1
     if bt_stage_conf "$BTC"; then
-        if [ "${ONEOS_GUEST_BT_LE_SANITIZE:-1}" != 0 ]; then
-            echo "Guest Bluetooth pairings: One UI's imported, never copied back; $(cat "$BTDIAG/sanitize.txt" 2>/dev/null)"
-        else
-            echo "Guest Bluetooth pairings: One UI's bt_config.conf copied unchanged (ONEOS_GUEST_BT_LE_SANITIZE=0; $(grep -c '^\[' "$BTD/bt_config.conf") sections, $(grep -c -E '^\[([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\]' "$BTD/bt_config.conf") of them devices; never copied back)"
-        fi
+        echo "Guest Bluetooth pairings: One UI's imported (ONEOS_GUEST_BT_IMPORT=1), never copied back; $(cat "$BTDIAG/sanitize.txt" 2>/dev/null)"
     else
-        echo "WARNING: One UI's Bluetooth pairings not imported (the LE check or the copy failed, or no [Adapter]); the guest starts with no pairings"
+        echo "WARNING: One UI's Bluetooth pairings not imported (the checks failed, or no [Adapter]); the guest starts with no pairings"
     fi
 fi
-# The guest's own file gets the same LE check (run 44 review): the stage's file
-# from run 43 still holds One UI's LE records with the bad PIDs (the guest's
-# stack saved what it had loaded), so ONEOS_GUEST_BT_IMPORT=0, or no file in One
-# UI, would bring run 43's broken audio back. A file the Pixel stack wrote from
-# its own pairings passes unchanged.
-if [ $bt_own = 1 ] && [ "${ONEOS_GUEST_BT_LE_SANITIZE:-1}" != 0 ] && [ ! -L "$BTD" ] && [ -d "$BTD" ] &&
+# The guest's own file gets the same checks (run 44 review): the stage's file
+# from runs 43 and 44 still holds One UI's records, LE ones with the bad PIDs
+# and BR/EDR ones with 64-hex link keys (the guest's stack saved what it had
+# loaded), so with no import, or no file in One UI, they would come back. A
+# file the Pixel stack wrote from its own pairings passes unchanged.
+if [ $bt_own = 1 ] && [ ! -L "$BTD" ] && [ -d "$BTD" ] &&
    [ -f "$BTD/bt_config.conf" ] && [ ! -L "$BTD/bt_config.conf" ]; then
     mkdir -p "$BTDIAG"
     $BB awk "$BT_AWK_FN$BT_SHAPE_AWK" "$BTD/bt_config.conf" > "$BTDIAG/shape_guest_prev.txt" 2>&1
     if bt_stage_conf "$BTD/bt_config.conf"; then
-        echo "Guest Bluetooth pairings: the guest's own after the LE check; $(cat "$BTDIAG/sanitize.txt" 2>/dev/null)"
+        echo "Guest Bluetooth pairings: the guest's own after the checks; $(cat "$BTDIAG/sanitize.txt" 2>/dev/null)"
     else
-        echo "WARNING: the guest's own Bluetooth pairings failed the LE check (or have no [Adapter]); the guest starts with no pairings"
+        echo "WARNING: the guest's own Bluetooth pairings failed the checks (or have no [Adapter]); the guest starts with no pairings"
     fi
+fi
+# Which of the guest's own devices One UI has paired too (run 45). A device
+# keeps one key for the phone's one Bluetooth address, so once One UI has
+# paired it again (as asked after run 44), the guest's key for it is out of
+# date: at its first connection in the guest it fails authentication and the
+# stack asks to pair again (run 44's bond loss and pairing dialogs), and
+# accepting unpairs it in One UI. Counted, with the last two address bytes as
+# logcat shows them, and One UI's file's shape in diag_bt/shape_oneui.txt (no
+# key value, no full address). One UI's file is only read, as for the import.
+if [ $bt_own = 1 ] && [ ! -L /data/misc/bluedroid ] && [ ! -L "$BTC" ] && [ -f "$BTC" ] &&
+   [ ! -L "$BTD" ] && [ -f "$BTD/bt_config.conf" ] && [ ! -L "$BTD/bt_config.conf" ]; then
+    mkdir -p "$BTDIAG"
+    $BB awk "$BT_AWK_FN$BT_SHAPE_AWK" "$BTC" > "$BTDIAG/shape_oneui.txt" 2>&1
+    both=$($BB awk "$BT_AWK_FN"'FILENAME == ARGV[1] { if (isdev($0)) one[tolower($0)] = 1; next }
+        isdev($0) { n++; if (tolower($0) in one) { b++; s = s ", xx:xx:xx:xx:" substr($0, 14, 5) } }
+        END { printf "%d of the %d devices paired in the guest%s", b, n, (b ? " (" substr(s, 3) ")" : "") }' "$BTC" "$BTD/bt_config.conf" 2>/dev/null)
+    echo "Guest Bluetooth pairings: ${both:-not compared}: also paired in One UI (if One UI paired one again after the guest did, the guest's key is out of date: a pairing request at its first connection in the guest, and accepting it unpairs it in One UI)"
 fi
 
 echo "=== 5d. Bridging host /data app and storage trees into the staged /data ==="

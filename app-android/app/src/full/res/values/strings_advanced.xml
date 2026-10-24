@@ -209,16 +209,16 @@
     <string name="switch_title">All checks and Test run</string>
     <string name="switch_cat_back">Ways back to One UI</string>
     <string name="switch_back_keys_title">Hold Volume Up + Volume Down for 3 seconds</string>
-    <string name="switch_back_keys_summary">Works once %1$s is starting: the phone restarts into One UI. While the OneOS logo still shows, use Force restart.</string>
+    <string name="switch_back_keys_summary">Works once %1$s is starting: One UI comes back, usually without a restart. While the OneOS logo still shows, use Force restart.</string>
     <string name="switch_back_auto_title">OneOS brings you back by itself</string>
-    <string name="switch_back_auto_summary">If %1$s doesn\'t finish starting, stops, or the screen stays black, the phone restarts into One UI after a few minutes.</string>
+    <string name="switch_back_auto_summary">If %1$s doesn\'t finish starting, stops, or the screen stays black, One UI comes back by itself after a few minutes.</string>
     <string name="switch_back_force_summary">Hold Power + Volume Down until it restarts into One UI. Afterwards, tap Restore One UI\'s settings in Advanced.</string>
     <string name="switch_back_root_summary">If root needs turning on again after a restart, do that, then open OneOS. Last session shows how it went.</string>
     <string name="switch_check_summary">Every check again: root, the set-up system, the screen lock, battery and free space. Nothing on the phone changes.</string>
     <string name="switch_need_full">Tap Check again first</string>
     <string name="switch_cat_go">Test run and switch</string>
     <string name="switch_dry_title">Test run</string>
-    <string name="switch_dry_summary">One UI closes while %1$s is set up and checked, then the phone restarts into One UI. %1$s doesn\'t start.</string>
+    <string name="switch_dry_summary">One UI closes while %1$s is set up and checked, then One UI comes back. %1$s doesn\'t start.</string>
     <string name="switch_go_summary">Every check runs again, then One UI closes and %1$s starts</string>
     <string name="switch_hide_gms_title">Hide Google apps this time</string>
     <string name="switch_hide_gms_summary">Leaves Play services and the Play Store out of %1$s this time only. Nothing else changes.</string>
@@ -234,15 +234,15 @@
     <string name="before_apps_summary">Apps in the other system can get the same root as One UI. One that does could reach One UI\'s data: install only apps you trust, and never grant root to ones you don\'t know.</string>
 
     <!-- About OneOS and Phone details (main's texts, in plain words and naming no system, for this edition) -->
-    <string name="tested_scope">Tested only on the Z Fold (F8U).</string>
-    <string name="about_what_summary">Runs another Android system next to One UI on a rooted phone, and comes back to One UI with a restart. Nothing is flashed.</string>
+    <string name="tested_scope">Tested on the Z Fold (F8U), S26 Ultra, S25 Ultra and S25.</string>
+    <string name="about_what_summary">Runs another Android system next to One UI on a rooted phone, and comes back to One UI, usually without a restart. Nothing is flashed.</string>
     <string name="about_version_scope_summary">Sets up a system you downloaded in its own folder and switches to it. Back to One UI or Volume Up + Down brings you back. OneOS downloads nothing itself and deletes nothing outside its folder without asking.</string>
-    <string name="about_tested_summary">Tested only on the Z Fold (F8U). The other phones OneOS lists are untested.</string>
+    <string name="about_tested_summary">Tested on the Z Fold (F8U), S26 Ultra, S25 Ultra and S25. Other phones are untested.</string>
     <string name="about_safety_summary">Every change OneOS makes as root is checked first, by the app and by root. Nothing outside OneOS\'s folder is ever deleted, and the other system is kept away from One UI\'s data.</string>
     <string name="report_title">Phone details</string>
     <string name="report_warning_next">Setup and the switch run their own checks and stop anything this phone can\'t run.</string>
 
     <!-- Session logs and the credits (main's texts, in plain words, for this edition) -->
     <string name="logs_delete_summary">Removes these logs from OneOS. The phone keeps its own copy in OneOS\'s folder until your next switch.</string>
-    <string name="about_credit_oneos_summary">The app and the changes OneOS makes to each system. Its session scripts started from OneLineage\'s (below).</string>
+    <string name="about_credit_oneos_summary">The app and the changes OneOS makes to each system. Its session scripts started from the project credited below.</string>
 </resources>

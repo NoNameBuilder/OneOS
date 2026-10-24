@@ -150,6 +150,11 @@ if in_image /system/framework/oplus-services.jar; then
     echo "Comfort View bridge: ColorOS image, left out"
 else
     KEY_DIRS="$KEY_DIRS $(python3 -I "$ROOT/switcher/patches/comfort_view_bridge.py" "$WORK/services" "$ROOT/switcher/patches/OneOSComfortView.smali")"
+    # Window blur stays on when the phone is warm (owner, run 45): only the
+    # thermal term leaves updateBlurEnabled(); Developer options and battery
+    # saver still turn it off (patches/guest_blur_no_thermal.py).
+    KEY_DIRS="$KEY_DIRS $(python3 -I "$ROOT/switcher/patches/guest_blur_no_thermal.py" "$WORK/services")"
+    echo "Window blur: not turned off by heat (BlurController.updateBlurEnabled)"
 fi
 java -jar "$APKTOOL" b -q -o "$WORK/rebuilt.jar" "$WORK/services"
 cp "$WORK/services.jar" "$OUT/services_patched.jar"

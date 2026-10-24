@@ -36,8 +36,8 @@ root for the read-only tests (the same probe path as Run tests in OneOS).
 
 - **The Pixel 11 Fold image on the Z Fold (F8U)** (`pixel11fold-yogi`,
   `google/yogi/yogi:17/CD1A.261005.003.B1`, Android 17): upload
-  `OneOS_Pixel11Fold_ZFold8.img.gz` (2497335461 B, SHA-256 `e7f26100…`),
-  unpacked `system.raw` 4728029184 B (`5f84c8cd…`); the gunzip of the .gz is
+  `OneOS_Pixel11Fold_Full_ZFold8.img.gz` (3288346862 B, SHA-256 `8fbe950c…`),
+  unpacked `system.raw` 6559223808 B (`8b303c37…`); the gunzip of the .gz is
   byte-identical to `out/oneos-pixel-yogi.img` (checked 2026-10-24). Its own
   file set `pixel-f8u`, offered on the Fold only, as a tested choice (runs
   41-44 booted it there, staged by `scripts/deploy-phone.sh`), after the Find

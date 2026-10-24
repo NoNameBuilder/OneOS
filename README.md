@@ -25,19 +25,20 @@ WeWaffles, and builds its guest images with
 [MysticGSI](https://github.com/MysticGSI/mysticgsi). See [Credits](#credits).
 
 > [!WARNING]
-> **Experimental. It can break your phone's data.** OneOS replaces core parts
-> of a running system as root. During development a guest system reached One
-> UI's data and deleted app data and photos, and a guest once took over the
-> phone's lock-screen hardware slot so that One UI could not unlock until a
-> factory reset. Both are guarded against now, but untested phones and images
-> can fail in new ways. Back up everything first, remove the screen lock
-> (PIN, pattern, password, fingerprint, face) before switching, and only use a
-> phone you can afford to reset. Nothing here is supported by Samsung, Google
-> or OPPO.
+> **Experimental. It can break your phone's data. Do not try this unless you
+> know what you are doing.** OneOS replaces core parts of a running system as
+> root. During development a guest system reached One UI's data and deleted
+> app data and photos, and a guest once took over the phone's lock-screen
+> hardware slot so that One UI could not unlock until a factory reset. Both
+> are guarded against now, but untested phones and images can fail in new
+> ways. **You must back up your accounts and data first, and remove the screen
+> lock (PIN, pattern, password, fingerprint, face) before switching.** Only use
+> a phone you can afford to reset. Nothing here is supported by Samsung,
+> Google or OPPO.
 
 ## Status
 
-App version 0.4.1. Snapdragon Samsung flagships only; root is required
+App version 0.4.7. Snapdragon Samsung flagships only; root is required
 (tested with KernelSU; Magisk and APatch are detected but untested).
 
 | Guest system | Tested on |
@@ -45,6 +46,10 @@ App version 0.4.1. Snapdragon Samsung flagships only; root is required
 | Pixel 11 Fold (Android 17) | Galaxy Z Fold8 Ultra (SM-F976B), One UI 9 |
 | ColorOS 17, Find N6 build | Galaxy Z Fold8 Ultra (SM-F976B), One UI 9 |
 | ColorOS 17, Find X9 Ultra CN build | Galaxy S25 (SM-S931), Galaxy S25 Ultra (SM-S938), Galaxy S26 Ultra (SM-S948) |
+
+Pixel 11 Fold on the Galaxy Z Fold8 Ultra: calls and SMS on both SIMs, 5G and
+Wi-Fi, Bluetooth audio, Google Play and Google's apps, the inner and cover
+screens, blur, and Back to One UI (usually without a restart).
 
 Known open issues for each system are in `docs/pixel-guest.md` and
 `docs/coloros-on-fold.md`.
@@ -75,12 +80,13 @@ findings file, so new phones can be checked without switching anything.
 
 5. Install the OneOS app and allow it in your root manager.
 6. In OneOS open **Systems**, tap **Download** on the system made for your
-   phone and download it, on Wi-Fi (2.5 to 5.3 GB).
+   phone and download it, on Wi-Fi (3.3 to 5.3 GB).
 7. Back in OneOS tap **I have the file**, pick the download, then **Set up**.
    Setup takes about 15 minutes: keep OneOS open and the phone plugged in. One
    UI keeps working meanwhile.
-8. Tap **Switch**. To come back, tap **Back to One UI** in the other system, or
-   hold **Volume Up + Volume Down** for 3 seconds. Stuck on the logo? Hold
+8. Tap **Switch**. To come back, tap **Back to One UI** in the other system
+   (usually no restart), or hold **Volume Up + Volume Down** for 3 seconds.
+   Stuck on the logo? Hold
    **Power + Volume Down** to restart into One UI.
 
 If your root does not survive a restart, activate it again after you come back.

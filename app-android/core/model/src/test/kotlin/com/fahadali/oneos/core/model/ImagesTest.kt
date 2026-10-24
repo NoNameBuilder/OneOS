@@ -31,16 +31,16 @@ class ImagesTest {
 
         // 0.3.7: the Pixel 11 Fold image, verified on the server (gunzip of the .gz == image, 2026-10-24).
         assertEquals("pixel11fold-yogi", pixel.id)
-        assertEquals("OneOS_Pixel11Fold_ZFold8.img.gz", pixel.gzName)
-        assertEquals(2_497_335_461L, pixel.gzBytes)
-        assertEquals("e7f26100543cec5e18fdecd587622b40b427219e3339a8fda53d7c54ac3c5124", pixel.gzSha256)
-        assertEquals(4_728_029_184L, pixel.rawBytes)
-        assertEquals("5f84c8cdcfe4abe9b4c037f6c1f7f60d767a80cb51e1f6c7c7a8347ce04405ee", pixel.rawSha256)
+        assertEquals("OneOS_Pixel11Fold_Full_ZFold8.img.gz", pixel.gzName)
+        assertEquals(3_288_346_862L, pixel.gzBytes)
+        assertEquals("8fbe950c47629c439af0807fc6bbb2afa29308c65c215849bcfa7a01f6b9290d", pixel.gzSha256)
+        assertEquals(6_559_223_808L, pixel.rawBytes)
+        assertEquals("8b303c37916288545b3b4a317c368d89680b5c3ce09873dc764381ddd0e32830", pixel.rawSha256)
         assertEquals("CD1A.261005.003.B1", pixel.buildId)
         assertEquals("Pixel 11 Fold", pixel.name)
         assertEquals(null, pixel.variant)
         assertEquals("Z Fold (F8U)", pixel.testedOn)
-        assertEquals(4_728_029_184L - (1L shl 32), pixel.gzIsize)
+        assertEquals(6_559_223_808L - (1L shl 32), pixel.gzIsize)
         // Its loader is built for SVE2 (the disassembly of its linker64); SME and MOPS have fallbacks.
         assertEquals(listOf("sve", "sve2"), pixel.cpuRequired)
         assertEquals(emptyList<String>(), pixel.cpuUsedByApps)
@@ -141,7 +141,7 @@ class ImagesTest {
             assertEquals(x9u, x9uOnFold.image)
             assertEquals(
                 "This is the Find X9 Ultra image; Z Fold (F8U) takes the Find N6 image (OneOS_ColorOS17_FindN6_ZFold8.img.gz) " +
-                    "or the Pixel 11 Fold image (OneOS_Pixel11Fold_ZFold8.img.gz).",
+                    "or the Pixel 11 Fold image (OneOS_Pixel11Fold_Full_ZFold8.img.gz).",
                 x9uOnFold.finding.detail,
             )
         }
@@ -188,7 +188,7 @@ class ImagesTest {
         // Nothing picked: what the phone takes.
         assertEquals(
             "Z Fold (F8U) takes the Find N6 image (OneOS_ColorOS17_FindN6_ZFold8.img.gz) or the Pixel 11 Fold image " +
-                "(OneOS_Pixel11Fold_ZFold8.img.gz)",
+                "(OneOS_Pixel11Fold_Full_ZFold8.img.gz)",
             ImageIdentifier.accepts(Profiles.F8U),
         )
         assertEquals("Galaxy S26 Ultra takes the Find X9 Ultra image (OneOS_ColorOS17_FindX9Ultra_S26U.img.gz)", ImageIdentifier.accepts(Profiles.S_ULTRA_8850))

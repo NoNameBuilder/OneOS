@@ -8,10 +8,16 @@ package com.fahadali.oneos.core.model
  * Fold defaults (`ONEOS_GUEST_FORM=fold` on an S Ultra). Root runs
  * [validate]'s rules again before it sources the file with `set -a`.
  *
- * Nothing here can turn the way back off: the return knobs (`ONEOS_RETURN_*`),
- * `ONEOS_STOCK_SF`, `ONEOS_KEEP_FOLD_LAYOUT`, `ONEOS_PREPARE_ONLY` (only root's
- * dry-run launch sets it) and the tunnel keys are not on the list, and
- * `ONEOS_LOGCAT` may only be 1. The scripts' own defaults apply to them.
+ * Nothing here can turn the way back off: the return knobs (`ONEOS_RETURN_MAX`,
+ * `ONEOS_RETURN_KEYS`), `ONEOS_STOCK_SF`, `ONEOS_KEEP_FOLD_LAYOUT`,
+ * `ONEOS_PREPARE_ONLY` (only root's dry-run launch sets it) and the tunnel keys
+ * are not on the list, and `ONEOS_LOGCAT` may only be 1. The scripts' own
+ * defaults apply to them.
+ *
+ * [RETURN_MODE] (0.4.7) is always `inplace`: Back to One UI restarts One UI's
+ * framework on the same boot (run 48, docs/inplace-return.md), and any check
+ * that fails there still ends in the full reboot. It cannot select anything
+ * else, so it cannot turn a way back off either.
  *
  * [HIDE_GMS] (0.3.3) is the one key a launch changes: Prepare writes 0, and
  * root's `launch` writes the Switch screen's choice for that launch only. 1 is
@@ -30,6 +36,9 @@ object SessionEnv {
     /** 1: hide Play services, the Play Store and their helpers in the guest for this session (guest_prepare.sh). */
     const val HIDE_GMS = "ONEOS_GUEST_HIDE_GMS"
 
+    /** How the return brings One UI back: always in place, with the reboot as its failsafe (return_to_oneui.sh). */
+    const val RETURN_MODE = "ONEOS_RETURN_MODE"
+
     /** Every key the app writes, in file order, with the values it may have. */
     val ALLOWED: Map<String, Regex> = linkedMapOf(
         "ONEOS_APP" to Regex("1"),
@@ -46,13 +55,13 @@ object SessionEnv {
         "ONEOS_GUEST_COMPACT_WINDOW" to Regex("[01]"),
         "ONEOS_GUEST_WALLPAPER_GRID" to Regex("[01]"),
         HIDE_GMS to Regex("[01]"),
+        RETURN_MODE to Regex("inplace"),
     )
 
     /** Never written; root refuses a file with any of them, any `ONEOS_TUNNEL_*` key, or any key not in [ALLOWED]. */
     val FORBIDDEN: Map<String, String> = linkedMapOf(
         "ONEOS_RETURN_MAX" to "0 turns off auto-return and the Volume Up+Down return",
         "ONEOS_RETURN_KEYS" to "0 turns off the Volume Up+Down return",
-        "ONEOS_RETURN_MODE" to "inplace returns without the reboot",
         "ONEOS_STOCK_SF" to "1 runs the guest without the composer patch",
         "ONEOS_KEEP_FOLD_LAYOUT" to "1 keeps the host's fold layout",
         "ONEOS_PREPARE_ONLY" to "only root's dry-run launch sets it",
@@ -107,6 +116,7 @@ object SessionEnv {
         )
         out.putAll(form)
         out[HIDE_GMS] = "0"
+        out[RETURN_MODE] = "inplace"
         return out
     }
 

@@ -113,15 +113,17 @@ class CpuAndVerdictTest {
     }
 
     @Test
-    fun s25UltraIsAnUntestedWarnInTheReport() {
-        // Owner, 0.3.1: the S25 Ultra profile is on, untested (the S26 Ultra's WARN).
+    fun s25UltraIsATestedPhoneInTheReport() {
+        // Owner, 0.3.1: the S25 Ultra profile is on, untested (the S26 Ultra's WARN);
+        // 0.4.7: the Find X9 Ultra build is marked tested on it.
         val f = Fixtures.s25Ultra()
         assertEquals(ModelFamily.S_ULTRA, f.family)
         assertEquals("Snapdragon 8 Elite (SM8750, sun)", f.soc.display)
         val r = CompatEvaluator.evaluate(f)
-        assertEquals(Verdict.WARNING, r.verdict)
+        assertEquals(Verdict.COMPATIBLE, r.verdict)
         assertNull(r.find(CompatEvaluator.ID_PROFILE_DISABLED))
-        assertEquals(Level.WARN, r.level("untested-model"))
+        assertEquals(Level.OK, r.level("tested-model"))
+        assertNull(r.find("untested-model"))
         assertEquals(Level.OK, r.level("soc-snapdragon"))
         assertEquals(0, r.count(Level.BLOCK))
 
@@ -135,10 +137,10 @@ class CpuAndVerdictTest {
     }
 
     @Test
-    fun s26UltraIsUntestedWarnNotBlock() {
+    fun s26UltraIsTested() {
         val r = CompatEvaluator.evaluate(Fixtures.s26Ultra())
-        assertEquals(Verdict.WARNING, r.verdict)
-        assertEquals(Level.WARN, r.level("untested-model"))
+        assertEquals(Verdict.COMPATIBLE, r.verdict)
+        assertEquals(Level.OK, r.level("tested-model"))
         assertEquals(0, r.count(Level.BLOCK))
     }
 }

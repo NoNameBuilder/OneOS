@@ -74,13 +74,16 @@ class GapSplashActivity : Activity() {
     /**
      * "Starting Pixel 11 Fold" ("Test run: checking …" for a test run), from
      * the last launch when it is this switch's: saved less than [FRESH_MS] ago
-     * on this boot. Otherwise "Starting the other system".
+     * on this boot. A switch the app did not start (adb, run 48 said "Starting
+     * the other system") takes the system Home last showed as set up; with
+     * neither, "Starting the other system".
      */
     private fun startingLine(): String {
         val launch = runCatching { SessionPrefs.lastLaunch(this) }.getOrNull()?.takeIf { l ->
             SystemClock.elapsedRealtime() - l.elapsedMs in 0L..FRESH_MS && !l.rebootedSince()
         }
         val image = launch?.let { Images.byId(it.imageId) }
+            ?: runCatching { SessionPrefs.homeSnapshot(this)?.image }.getOrNull()
         val system = Images.systemName(image, launch?.let { Profiles.byId(it.profileId) })
         val line = if (image != null && launch?.dryRun == true) R.string.splash_test_run else R.string.splash_starting
         return getString(line, system)

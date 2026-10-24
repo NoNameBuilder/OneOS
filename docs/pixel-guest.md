@@ -378,7 +378,9 @@ read. `ONEOS_GUEST_BT_LE_SANITIZE=0` imports it unchanged;
 `ONEOS_GUEST_BT_IMPORT=0` keeps the guest's own file, which goes through the
 same filter (the stage's file from run 43 still holds One UI's bad LE data; a
 file the Pixel stack wrote from its own pairings passes unchanged). The same
-happens when One UI has no `bt_config.conf`.
+happens when One UI has no `bt_config.conf`. Since run 44 the import is off by
+default, a link key check runs on every file, and `ONEOS_GUEST_BT_LE_SANITIZE=0`
+only skips the LE part (see Run 44).
 
 `$STAGE/diag_bt/` (pulled with the other `diag_*`): `shape_oneui.txt` and
 `shape_guest_prev.txt` (the file the Pixel stack itself wrote last session)
@@ -494,6 +496,238 @@ guest's system_ext mounts, com.android.phone's pid, the injection lines) and
 `signal_polls.txt` (every SIGNAL_STRENGTH request and answer still in the radio
 log); `telephony_registry.txt` should then show mSignalStrength levels that
 match mCellInfo.
+
+## Run 44 (2026-10-24)
+
+About 8 minutes on the Fold, on a stage that was already set up, started from
+the app and ended with "Back to One UI" in the in-guest app (a reboot return).
+
+Worked:
+- SIM 2 calls both ways, through the call keeper's `hal` path. Before any call
+  the path check sent `g_call_sim_slot=0x02 via hal` and logged `HAL got it;
+  HAL state I2`; the HAL logged `configured g_call_sim_slot` and `updateSecVSID:
+  mCurVSID to VSID_2`. One outgoing and one incoming call each went `INACTIVE ->
+  ACTIVE vsid:VSID_2`, with audio both ways. No 0x10 swap was needed. Both
+  calls ran on 3G (the guest has no IMS) and went back to LTE afterwards.
+- Signal bars: the TelephonyComponentFactory injection loaded (`validated
+  paths: /system_ext/framework/oneos-telephony.jar`, `Total components
+  injected: 1`, both `OneOSSignalPoll` lines). There were 44 `SIGNAL_STRENGTH`
+  polls, one per SIM every 20 s, all answered, and the registry's levels match
+  the cell info.
+- Mobile data and 5G NSA on SIM 2: the attach APN was One UI's, data
+  validated, and `overrideNetwork=NR_NSA` showed except during the calls (on
+  3G). One network-side drop lasted 2 s.
+- Wi-Fi joined and validated. It dropped and reconnected twice on a weak
+  5 GHz link (Android's normal linger while cellular is validated); nothing to fix.
+- gvld: the guest vold registered as `gvld`, and One UI's vold kept `vold` and
+  `IVold/default` (`vold_names.txt` was the same in all three diagnostics
+  rounds). IncrementalService started.
+- Also: the fold line, HW overlays (0 composer rejections), Google Play
+  services, the in-guest OneOS app, and the return.
+
+Failed, and the fixes:
+- A2DP: every connect went to the offload path
+  (`A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH`). Samsung's QTI HAL logged
+  `handleDeviceConnectionChangebt_offload state is disabled` (10 times), then
+  PAL `BT device 8 not connected or not ready` on every write while A2DP was the
+  route. Commit 5ba9ff7 sets
+  `persist.bluetooth.a2dp_offload.disabled` and `leaudio_offload.disabled` to
+  true for the session in non-ColorOS guests: memory only, One UI's values are
+  recorded and restored. That moves the guest's stack to software encoding; it
+  does not change the HAL's offload state.
+  **Pending (static analysis of `libaudiocorehal.qti.so`, not seen on a phone
+  yet).** The HAL's offload state is bit 21 of the number in the Samsung vendor
+  parameter `l_a2dp_format`, which only One UI's framework sends; nothing in
+  the Pixel stack does, and the guest audioserver (no vendor extension) would
+  drop it anyway. The two persist props are only read where the audioserver
+  asks whether offload can be reconfigured. The config file is chosen once per
+  HAL process: One UI's `audio_module_config_primary.xml` only after One UI's
+  audioserver has sent the vendor parameter `l_support_sec_audio_feature`,
+  otherwise `audio_module_config_primary_sec_on_gsi.xml`, which is what the
+  HAL restarted for the guest loads. Both files put the three BT A2DP ports on
+  the primary module (One UI's without encodings, which counts as every format;
+  the GSI one with `encodings="audio/mp4a.40 audio/x-sbc"`), so the guest
+  audio policy attaches A2DP to primary with either file: `[default]
+  setConnectedState` matched template port 24, the primary port, and each
+  attempt to open the stream on the `bluetooth` module failed in
+  `prepareToOpenStream`. With 5ba9ff7 alone the audio is expected to stay on
+  the speaker. Fix (guest_start.sh, guest_props.sh): A2DP offload stays on as
+  in One UI (the A2DP part of 5ba9ff7 is undone; LE Audio stays in software),
+  and the session sends `l_a2dp_format=2097152` (bit 21) to IModule/default
+  with the call keeper's parcel (sizes 124, 76, 24) when the guest audioserver
+  starts and again after every HAL restart (log `/data/oneos_a2dp.log`, kept by
+  the return). `l_support_sec_audio_feature` is never sent. Not proven yet:
+  whether Samsung's Bluetooth controller accepts the Pixel stack's offload start.
+- HFP: a call routed to the earbuds stayed silent. Telecom made the earbuds
+  active and the HAL patched `[Telephony Rx -> BT SCO Headset]`, but the stack
+  never left `BTA_AG_SCO_LISTEN_ST`. The guest audioserver only ever sent
+  `BT_SCO=off`, and PAL logged `BT device 7 not connected or not ready`. Cause:
+  the image's product build.prop sets `bluetooth.sco.managed_by_audio=true` and
+  One UI does not define it, so guest_props.sh added it. With it, Pixel's
+  Telecom, AudioService and Bluetooth stack leave opening SCO to the audio HAL,
+  and Samsung's HAL never does that by itself. Fix (guest_props.sh `add`): for
+  non-ColorOS guests the prop is left out, so it is undefined (false) as in One
+  UI. AudioService then opens SCO through the stack and sends `BT_SCO=on`, which
+  reaches the HAL as `setScoConfig` through the standard IBluetooth (no vendor
+  extension needed). `ONEOS_GUEST_SCO_MANAGED=1` keeps it. The call keeper's
+  start line now shows `bluetooth.sco.managed_by_audio=unset`.
+  The image's other LE Audio offload props are left out the same way, under
+  `ONEOS_GUEST_BT_OFFLOAD` (`=1` keeps them). One UI does not define them:
+  - `ro.bluetooth.leaudio_offload.supported`: together with One UI's
+    `leaudio_offload.disabled=false`, it put the Pixel stack's LE Audio codec on
+    the DSP in run 44 (`codec_manager.cc ... configure_data_path for encode`,
+    `LE_AUDIO_HARDWARE_OFFLOAD` capabilities read twice). That is the same HAL
+    path that refused A2DP.
+  - `persist.bluetooth.leaudio_sw_offload` and
+    `persist.vendor.audio.leaudio_sw_offload`: they are for Pixel's own audio
+    HAL. Nothing in the image's Bluetooth module, framework.jar, services.jar or
+    audioserver libraries reads them, and neither does the QTI HAL library.
+- Pairing import: off by default now (`ONEOS_GUEST_BT_IMPORT=1` turns it on).
+  One UI stores link keys in a form that is not AOSP's: 64 hex characters (32
+  bytes) for each BR/EDR device, and its LE keys are 64 hex too. The Pixel
+  stack writes 32 hex (16 bytes). The imported keys only caused trouble:
+  `HCI_ERR_AUTH_FAILURE`, `Bond loss detected ... KEY_MISSING`, the stack's
+  autonomous re-pairing, and three pairing dialogs the owner accepted. Now any
+  device whose `LinkKey` is not exactly 32 hex characters is dropped, from One
+  UI's file and from the stage's own file. The stage's file still holds One
+  UI's earlier imported records: run 43's file, saved by the guest's stack,
+  kept one with its 64-hex key. The takeover log counts them ("N with a
+  LinkKey not in AOSP form (32 hex) dropped"). Pairings the guest made itself
+  are always 32 hex and stay as they are. One UI's file is only read; the
+  switch refuses to start if the stage's Bluetooth folder or file is One UI's
+  own (a hard link, for instance). **The earbuds now hold a key the guest
+  made: pair them again in One UI.**
+- Bluetooth process crash: one FATAL NPE in the guest's Bluetooth process
+  (`CsipSetCoordinatorService.bondStateChanged`, `Map.forEach` on null). It
+  came during the auto re-pair of an imported device whose CSIP and LE records
+  the filter had removed; the process restarted 0.5 s later. No One UI record
+  reaches the guest any more, so this path is gone.
+- Diagnostics: the call keeper's per-call lines were in no capture. Both calls
+  came after diag_90, and a reboot return writes no diag_final. Now
+  return_to_oneui.sh first copies `call_audio.log` and `audio_keeper.log` from
+  the stage into the session's log folder (`oneos_logs`, next to `boot.log`),
+  before anything is stopped and on both return paths.
+  Run 45 review, for the same reason (the earbuds connected minutes after
+  diag_90): the return also saves the guest's Bluetooth and audio state before
+  it stops anything, in `diag_return/` (`bluetooth_manager.txt` without
+  base64-only lines, `dumpsys_media.audio_policy.txt`, `dumpsys_audio.txt`,
+  `bt_props.txt`). It reads the guest's own dumpsys in its namespace, 8 s at
+  most per dump, side by side. The A2DP sender checks each send in the HAL's
+  log, as the call keeper does. `oneos_a2dp.log`, `audio_keeper.log` and
+  `call_audio.log` grow across sessions, so each session now starts with a
+  dated line in them. The switch clears `diag_20/40/90/final`, `diag_pages`
+  and `diag_return`, so a file a round skips is not the last session's. The
+  takeover log counts the guest's devices that One UI has paired too, and
+  `diag_bt/shape_oneui.txt` is written with the import off as well.
+- IMS / VoLTE: not supported in the guest (known), so calls fall back to 3G.
+
+Not tested: SIM 1 calls, including a SIM 1 call after a SIM 2 call (the 0x10
+swap and `HAL A1`); GPS (the HAL started, and GMS got 0 locations in 7.7 s of
+tracking); NFC (the stack came up; no tag or HCE); SMS; whether both
+loudspeakers play on speakerphone.
+
+Thermal: the phone was warm at the switch and not charging. Skin temperature
+reached 45.2 °C (SEVERE) about 20 s after the guest's system_server started,
+and dropped back to MODERATE (41.9 °C) about 1.5 minutes later. One UI's last CPU cap stayed for the whole
+session: both clusters at 2.112 GHz, about half their maximum. One UI's SIOP
+set it just before One UI stopped, and nothing in the guest adjusts it. Android
+17 turns window blur off at SEVERE, which is why blur was flat from 17:29:49 to
+17:31:13; the blur setting was not the cause. Also adding load:
+- the zygote runs `-Xforcejitzygote`, so the image's AOT boot image is never
+  used;
+- One UI's artd cannot dexopt guest apps;
+- the guest's screen never times out.
+These are follow-ups, not part of this change.
+
+Check in run 45. Files: the switch's log is the stage's `takeover_app.log`.
+The guest's start-up log is `data/takeover.log`, which pull-run-logs.sh
+names `takeover_inner.log`. The keepers' logs are in the stage's `data/`, and
+in `oneos_logs/` after the return. In each keeper log, only the lines after
+the last `=== <date> session` line are run 45's.
+- The new scripts ran: `takeover_inner.log` has `A2DP offload:
+  l_a2dp_format=2097152 to the audio HAL, ... each send checked`. If that line
+  is missing, the stage still has 0.4.1's scripts, and none of the fixes below
+  applied.
+- Props, in `takeover_app.log`: `guest_props: bluetooth.sco.managed_by_audio
+  left out for the session`, `persist.bluetooth.leaudio_offload.disabled=false
+  overridden to true`, and `left out for the session ...:
+  ro.bluetooth.leaudio_offload.supported ...`. `persist.bluetooth.a2dp_offload`
+  must not be named, because One UI's `false` stays.
+  `diag_return/bt_props.txt` has the values at the end.
+- Pairings, in `takeover_app.log`: `Guest Bluetooth pairings: the guest's own;
+  ...`, then `... after the checks; N devices, M with a LinkKey not in AOSP form
+  (32 hex) dropped ...`, then `K of the N devices paired in the guest
+  (xx:xx:xx:xx:..:..): also paired in One UI`. If the earbuds are in that list
+  and were paired again in One UI after run 44, expect a pairing request in
+  the guest (see below).
+- HFP, during a call on the earbuds:
+  - `call_audio.log`: `bluetooth.sco.managed_by_audio=unset`.
+  - all.log:
+    - `DeviceHalAidl: [default] setParameters: parameters: "BT_SCO=on"`;
+    - `AHAL_Bluetooth_QTI: setScoConfig: received ScoConfig{isEnabled:
+      Boolean{value: true}`;
+    - `bta_ag_sco_event: SCO_state_change: [BTA_AG_SCO_LISTEN_ST(0x01)]->[...OPENING...]`,
+      then to `...OPEN...`;
+    - no `PAL: StreamPCM: open: ... BT device 7 not connected or not ready`.
+  - Probably no `startSession - SessionType=HFP_HARDWARE_OFFLOAD_DATAPATH` at
+    the HFP connect. Run 44 had one at 17:32:16, because the stack left SCO to
+    the HAL.
+  - Failure looks like run 44: only `BT_SCO=off`, and the stack staying in
+    `BTA_AG_SCO_LISTEN_ST`.
+  - If SCO opens and the call is still silent, look at the SCO codec. Run 44
+    matched the earbuds to the stack's `INTEROP_HFP_1_9_ALLOWLIST`, and One UI
+    sets `bluetooth.hfp.swb.supported=true`, so a super-wideband codec is
+    possible. Check the `bt_wbs`/`bt_swb` keys in the guest's `setParameters`
+    lines and the `mode` in `setScoConfig`.
+- A2DP:
+  - `oneos_a2dp.log`: `l_a2dp_format=2097152 (sizes 124 76 24) to the audio HAL
+    pid N: Result: Parcel(00000000 '....'); HAL: processSetVendorParameters:
+    configured l_a2dp_format`. The `Parcel(00000000` part alone proves
+    nothing. `HAL NEVER logged it` means the bit is not set. So does `not
+    configured`.
+  - all.log, at each connect:
+    `BTAudioProviderStub: startSession - SessionType=A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH`,
+    then `AHAL_Platform_QTI: handleDeviceConnectionChangebt_offload state is
+    enabled`.
+  - Failure looks like run 44: `... is disabled`, then thousands of `PAL:
+    StreamPCM: open: 224: BT device 8 not connected or not ready` and
+    `pal_stream_open failed with status -19` while music plays.
+  - Also look for `[default] setConnectedState` against `[bluetooth] ...` and
+    for `Hal2AidlMapper: prepareToOpenStream ... Failed`, to see which module
+    took the A2DP device.
+- At the return, in `diag_return/`:
+  - `bluetooth_manager.txt`: the bonded devices; `A2DP:` and `HFP:` with
+    `Connected count` and `Active`; `Offload started handle` (not 0 while
+    music plays); `SCO occupied`; the A2DP codec.
+  - `dumpsys_media.audio_policy.txt`: the module and output that the BT
+    A2DP device is attached to.
+  - `dumpsys_audio.txt`: the communication device and SCO state.
+- LE Audio: the earbuds should connect over A2DP and HFP, as in run 44.
+  `LeAudioService` connection lines, or an LE Audio toggle that is on in the
+  device's settings, mean this run tested neither of those two fixes.
+
+The earbuds and the guest. The import is off, so the guest only has its own
+pairings. The stage's file still has the earbuds from run 44, with a guest key
+that passes the checks. A device keeps one key for the phone's one Bluetooth
+address:
+- If the earbuds were paired again in One UI after run 44, the guest's key is
+  out of date. At the first connection in the guest you get
+  `HCI_ERR_AUTH_FAILURE`, `Bond loss detected`, and a pairing request. Accept
+  it, as in run 44, or for a cleaner start:
+  1. In the guest, go to Settings > Connected devices, open the earbuds and
+     tap Forget.
+  2. Put the earbuds in pairing mode.
+  3. Go to Settings > Connected devices > Pair new device and pair them.
+- If One UI did not pair them again, they connect in the guest without a
+  request.
+
+Either way, after the session One UI's key is the stale one: pair the earbuds
+again in One UI. In the device's settings in the guest, Phone calls and Media
+audio must be on. Google Dialer has Nearby devices (granted by the UI
+activator, `[UI Activator] dialer:` in `ui_activator.log`). To leave them out
+of the session, keep the earbuds in the case and decline any pairing dialog.
+Removing a device One UI also has paired from the stage's file is a separate
+decision.
 
 ## Open (not seen on a phone yet)
 

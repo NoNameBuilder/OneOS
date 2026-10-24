@@ -35,7 +35,7 @@
 
     <!-- A whole-row tap target in a list card: 56dp or more. -->
     <style name="OneOS.Row" parent="">
-        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:background">@drawable/oneos_row_ripple</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
         <item name="android:gravity">center_vertical</item>

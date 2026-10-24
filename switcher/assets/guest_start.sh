@@ -656,9 +656,54 @@ if [ -f /data/guest_audio.flag ]; then
     n=0
     while [ $n -lt 50 ] && ! service check android.hardware.audio.core.IModule/default 2>/dev/null | grep -q ": found"; do n=$((n + 1)); sleep 0.2; done
     echo "[Pivoted Root] audio HAL IModule/default:$(service check android.hardware.audio.core.IModule/default 2>/dev/null | cut -d: -f2) after $((n / 5))s"
+    # A2DP offload (run 44): Samsung's QTI HAL turns its Bluetooth offload path
+    # on only from the vendor parameter l_a2dp_format (bit 21 of the number,
+    # Platform+8), which One UI's audioserver sends and a GSI's never does: every
+    # connect logged "bt_offload state is disabled" and the earbuds played on the
+    # speaker. Sent with the call keeper's IModule parcel (sizes 124, 76, 24 for
+    # 2097152) and again whenever the HAL restarts. Never l_support_sec_audio_feature,
+    # which would switch the HAL to One UI's module config. The value lives in the
+    # HAL process only, and the return restarts the HAL before One UI's
+    # audioserver. ColorOS guests: untouched. ONEOS_GUEST_A2DP_FORMAT=0 skips it.
+    # Each send is checked against the HAL's own log, as the call keeper does
+    # (run 43: a binder reply of 00000000 for a key the HAL never got), and
+    # oneos_a2dp.log gets the HAL's line ("configured l_a2dp_format", or "not
+    # configured ..." for a key it does not take). The log, like the keepers'
+    # logs, grows across sessions: each session starts with a dated line.
+    A2F=${ONEOS_GUEST_A2DP_FORMAT:-2097152}
+    case "$A2F" in ""|*[!0-9]*) A2F=0 ;; esac
+    if [ "$A2F" != 0 ] && [ ! -f /system/framework/oplus-services.jar ]; then
+        echo "=== $(date '+%F %T') session: l_a2dp_format=$A2F to the audio HAL" >> /data/oneos_a2dp.log
+        $BB sh -c 'v=$1; bb=$2
+            s16() { echo $((4 + (${#1} * 2 + 5) / 4 * 4)); }
+            vs=$((4 + $(s16 "$v"))); hs=$(($(s16 qti.audio.core.VString) + vs)); ps=$((4 + $(s16 l_a2dp_format) + 12 + hs))
+            # The HAL (pid h) line for the key, the last one; empty if none.
+            seen() { logcat -d --pid="$h" -s AHAL_SecModulePrimary 2>/dev/null | $bb grep -F "configured l_a2dp_format" | tail -n 1; }
+            hp=""; n=0
+            while :; do
+                h=$(dumpsys --pid android.hardware.audio.core.IModule/default 2>/dev/null | head -n 1 | tr -dc 0-9)
+                if [ -n "$h" ] && [ "$h" != "$hp" ]; then
+                    b=$(seen)
+                    r=$(service call android.hardware.audio.core.IModule/default 34 i32 1 i32 1 i32 $ps s16 l_a2dp_format i32 1 i32 1 i32 $hs s16 qti.audio.core.VString i32 $vs s16 "$v" i32 0 2>&1 | tr -s " \n" " " | head -c 100 | $bb sed "s/ *\$//")
+                    sleep 1; a=$(seen)
+                    [ -n "$a" ] && [ "$a" != "$b" ] || { sleep 2; a=$(seen); }
+                    if [ -n "$a" ] && [ "$a" != "$b" ]; then ok="HAL: ${a#*: }"
+                    else ok="HAL NEVER logged it (no AHAL_SecModulePrimary line for l_a2dp_format from pid $h)"; fi
+                    echo "$(date +%T) l_a2dp_format=$v (sizes $ps $hs $vs) to the audio HAL pid $h: $r; $ok"
+                    # Not logged by the HAL: sent again on the next round, 3 tries per HAL pid.
+                    if [ -n "$a" ] && [ "$a" != "$b" ]; then hp=$h; n=0
+                    else n=$((n + 1)); [ $n -lt 3 ] || { hp=$h; n=0; echo "$(date +%T) l_a2dp_format: gave up on HAL pid $h after 3 tries"; }; fi
+                fi
+                sleep 10
+            done' oneos_a2dp "$A2F" "$BB" >> /data/oneos_a2dp.log 2>&1 &
+        echo "[Pivoted Root] A2DP offload: l_a2dp_format=$A2F to the audio HAL, again on every HAL restart, each send checked in the HAL log (/data/oneos_a2dp.log)"
+    else
+        echo "[Pivoted Root] A2DP offload: l_a2dp_format not sent ($([ "$A2F" = 0 ] && echo ONEOS_GUEST_A2DP_FORMAT=0 || echo ColorOS guest))"
+    fi
     /system/bin/audioserver > /dev/null 2>&1 &
     AS_PID=$!
     echo "[Pivoted Root] guest audioserver PID: $AS_PID (registers once the guest framework is up)"
+    echo "=== $(date '+%F %T') session: guest audioserver $AS_PID" >> /data/audio_keeper.log
     $BB sh -c 'as=$1
         owner() { dumpsys --pid media.audio_policy 2>/dev/null | tr -dc 0-9; }
         handover() {
@@ -742,7 +787,11 @@ fi
 # switches path once, and only on an idle 0x01/0x02 (never a 0x10), after a
 # second look for a late HAL line. ONEOS_GUEST_CALL_SIM_VIA=af|hal
 # forces the first path (af: through the guest AudioFlinger).
+# call_audio.log grows across sessions and its lines carry the time only (run
+# 44's capture still had a session of 09:07 before run 44's): a dated line
+# first.
 if [ -f /data/guest_audio.flag ] && [ "${ONEOS_GUEST_CALL_SIM:-1}" != 0 ]; then
+    echo "=== $(date '+%F %T') session" >> /data/call_audio.log
     $BB sh -c 'bb=$1
         if [ "$2" != 2 ]; then
             lib=""
@@ -771,7 +820,10 @@ if [ -f /data/guest_audio.flag ] && [ "${ONEOS_GUEST_CALL_SIM:-1}" != 0 ]; then
         vt=$(grep -l -s -F qti.audio.core.VString /vendor/lib64/*audio*.so /vendor/lib64/hw/*audio*.so 2>/dev/null | head -n 2 | tr "\n" " "); vt=${vt% }
         uc=$([ -n "$lib" ] && grep -c -s -F AIBinder_getCallingUid "$lib")
         echo "$(date +%T) g_call_sim_slot path $via first ($why; extension service:$(service check android.media.audio.IHalAdapterVendorExtension/default 2>&1 | cut -d: -f2))"
-        echo "$(date +%T) VString in: ${vt:-none}; AIBinder_getCallingUid in the HAL: ${uc:-?}; bluetooth.sco.managed_by_audio=$(getprop bluetooth.sco.managed_by_audio)"
+        # Run 44: true (the image value) kept SCO closed; guest_props.sh now
+        # leaves it out for Pixel guests, so unset is what a call needs.
+        sm=$(getprop bluetooth.sco.managed_by_audio)
+        echo "$(date +%T) VString in: ${vt:-none}; AIBinder_getCallingUid in the HAL: ${uc:-?}; bluetooth.sco.managed_by_audio=${sm:-unset}"
         # IModule.setVendorParameters is transaction 34 (BpModule in the
         # image android.hardware.audio.core-V4-ndk.so). The parcel is the one
         # the QTI extension builds, the layout ColorOS sent in run 34:
@@ -979,6 +1031,50 @@ if [ "$VOLD_NAME" = gvld ]; then
         exit 1
     fi
     echo "[Pivoted Root] Before zygote: gvld is the guest vold's ($VOLD_PID); vold One UI's ($HOST_VOLD), android.system.vold.IVold/default $(vdef)"
+fi
+
+# Forced JIT zygote (run 44). OneLineage's zygote_exec always passed
+# -Xforcejitzygote, and so did ours: ART then ignores the image's own AOT boot
+# image (/system/framework/arm64/boot*.art/.oat/.vdex, built with the image
+# for its ART module and framework jars), compiles the boot class path in
+# memory at every zygote start (run 44: dex2oat64 --compiler-filter=verify
+# --oat-location=/nonx/arm64/boot.oat, 1.4 s, 3.4 s CPU) and runs framework
+# code JIT-compiled only, in every guest process. zygote_exec (zygote_launcher.c)
+# passes the flag only with ONEOS_GUEST_JIT_ZYGOTE=1: the default for ColorOS
+# guests (oplus-services.jar), which have only ever run that way and are
+# untested without it; 0, the image's boot image, for the others (Pixel).
+case "${ONEOS_GUEST_JIT_ZYGOTE:-}" in
+    0|1) JIT_WHY="ONEOS_GUEST_JIT_ZYGOTE=$ONEOS_GUEST_JIT_ZYGOTE" ;;
+    *)
+        [ -n "${ONEOS_GUEST_JIT_ZYGOTE:-}" ] && echo "[Pivoted Root] ONEOS_GUEST_JIT_ZYGOTE=$ONEOS_GUEST_JIT_ZYGOTE is not 0 or 1: the default"
+        if [ -e /system/framework/oplus-services.jar ]; then
+            ONEOS_GUEST_JIT_ZYGOTE=1; JIT_WHY="ColorOS default, oplus-services.jar"
+        else
+            ONEOS_GUEST_JIT_ZYGOTE=0; JIT_WHY="default, no oplus-services.jar"
+        fi ;;
+esac
+export ONEOS_GUEST_JIT_ZYGOTE
+if [ "$ONEOS_GUEST_JIT_ZYGOTE" = 1 ]; then
+    echo "[Pivoted Root] zygote: -Xforcejitzygote ($JIT_WHY): boot class path compiled in memory, framework JIT only"
+else
+    # Whether ART can take that image: besides the jars' checksums (the image's
+    # own jars, art_payload.img and i18n_payload.img from the image's APEXes)
+    # it checks the boot oat's apex-versions (the image's build: "/" for each
+    # factory module) against the versions /apex/apex-info-list.xml gives the
+    # boot class path's modules. guest_prepare.sh copies One UI's list there
+    # when the set has no clean_apex_info_list.xml, and an updated One UI ART
+    # module makes ART reject the image (run 44's guest app_process tools:
+    # "ValidateApexVersions found APEX versions mismatch ... Oat file:
+    # '//////', Runtime: '/1792624397/..."). The zygote then compiles the boot
+    # class path in memory, as with the flag. Read only.
+    UPD=$(awk 'BEGIN { RS = "<" } /^apex-info[[:space:]]/ && /moduleName="com\.android\.(art|i18n)"/ && /isActive="true"/ && /isFactory="false"/ {
+        m = $0; sub(/.*moduleName="/, "", m); sub(/".*/, "", m); printf "%s ", m }' /apex/apex-info-list.xml 2>/dev/null)
+    BOOT_OATS=$(ls /system/framework/arm64/boot*.oat 2>/dev/null | wc -l)
+    if [ -n "$UPD" ]; then
+        echo "[Pivoted Root] zygote: the image's boot image ($JIT_WHY, $BOOT_OATS oat files), but /apex/apex-info-list.xml has ${UPD}as updated: ART will reject it (APEX versions) and compile the boot class path in memory"
+    else
+        echo "[Pivoted Root] zygote: the image's boot image ($JIT_WHY): $BOOT_OATS oat files in /system/framework/arm64, no updated ART or i18n module in /apex/apex-info-list.xml"
+    fi
 fi
 
 echo "[Pivoted Root] Cleaning stale sockets..."

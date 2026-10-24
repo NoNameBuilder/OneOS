@@ -229,8 +229,8 @@ class PackageSetsTest {
         assertEquals("22.5 GB", Units.bytes(need))
         // The Pixel image is smaller: its own raw size and files.
         val pixelNeed = SpaceRule.toStage(Images.PIXEL_YOGI, pixel)
-        assertEquals(4_728_029_184L + 485_687_124L + 11L * SpaceRule.GIB, pixelNeed)
-        assertEquals("17.0 GB", Units.bytes(pixelNeed))
+        assertEquals(6_559_223_808L + 485_687_124L + 11L * SpaceRule.GIB, pixelNeed)
+        assertEquals("18.9 GB", Units.bytes(pixelNeed))
         assertEquals(11L * SpaceRule.GIB, SpaceRule.LAUNCH_BYTES)
         assertEquals(Images.FIND_X9U.rawBytes + SpaceRule.LAUNCH_BYTES, SpaceRule.toStage(Images.FIND_X9U, null))
     }

@@ -11,7 +11,7 @@
 
     <string name="back">Back to One UI</string>
     <!-- True for the reboot return (ONEOS_RETURN_MODE=reboot, the only mode the session takes today). -->
-    <string name="back_caption">The phone restarts into One UI, in about a minute. Apps open here close, so save your work first.</string>
+    <string name="back_caption">One UI comes back in about a minute, usually without a restart. Apps open here close, so save your work first.</string>
 
     <string name="confirm_title">Back to One UI</string>
     <string name="confirm_message">Return to One UI now? Unsaved work in apps will be lost.</string>

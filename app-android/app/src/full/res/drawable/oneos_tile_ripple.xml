@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tile press: the whole tile, with the tile's corners. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?android:attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/oneos_tile_radius" />
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+</ripple>

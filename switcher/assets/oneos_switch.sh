@@ -155,7 +155,9 @@ if [ "$APP" = 1 ]; then
     [ "$RMAX" -ge 300 ] && [ "$RMAX" -le 900 ] || refuse "ONEOS_RETURN_MAX=$RMAX (300..900)"
     [ "$RBLACK" -ge 60 ] && [ "$RBLACK" -le "$RMAX" ] || refuse "ONEOS_RETURN_BLACK=$RBLACK (60..ONEOS_RETURN_MAX)"
     [ "${ONEOS_RETURN_KEYS:-1}" = 1 ] || refuse "ONEOS_RETURN_KEYS=$ONEOS_RETURN_KEYS"
-    [ "${ONEOS_RETURN_MODE:-reboot}" = reboot ] || refuse "ONEOS_RETURN_MODE=$ONEOS_RETURN_MODE"
+    # 0.4.7: the app's session.env asks for the in-place return (run 48); any
+    # check that fails there still reboots (return_to_oneui.sh failsafe).
+    case "${ONEOS_RETURN_MODE:-reboot}" in reboot|inplace) ;; *) refuse "ONEOS_RETURN_MODE=$ONEOS_RETURN_MODE" ;; esac
     [ "${ONEOS_LOGCAT:-1}" = 1 ] || refuse "ONEOS_LOGCAT=$ONEOS_LOGCAT"
     [ "${ONEOS_STOCK_SF:-0}" = 0 ] || refuse "ONEOS_STOCK_SF=$ONEOS_STOCK_SF"
     [ "${ONEOS_KEEP_FOLD_LAYOUT:-0}" = 0 ] || refuse "ONEOS_KEEP_FOLD_LAYOUT=$ONEOS_KEEP_FOLD_LAYOUT"
@@ -303,8 +305,11 @@ host_state > "$STAGE/host_state.before"
 # A Wi-Fi capture from an earlier session must not be pulled as this one's.
 # Nor a fold test or a display capture: run 43's diag_fold was run 41's (lid
 # events at 04:17, nothing cleared it), and its HALF_OPENED after a flat
-# unfold nearly decided the run-44 posture fix.
-rm -rf "$STAGE/diag_wifi" "$STAGE/diag_fold" "$STAGE/diag_display"
+# unfold nearly decided the run-44 posture fix. Nor the rounds (mkdir -p and
+# overwrite: a file a round skips this time, such as a stack of an app that is
+# not running, would be the last session's) and the return's capture.
+rm -rf "$STAGE/diag_wifi" "$STAGE/diag_fold" "$STAGE/diag_display" "$STAGE/diag_pages" \
+       "$STAGE/diag_20" "$STAGE/diag_40" "$STAGE/diag_90" "$STAGE/diag_final" "$STAGE/diag_return"
 echo "Host state recorded: $(wc -l < "$STAGE/host_state.before") entries"
 # This phone's camera hole, while One UI's display service still runs, for
 # guest_props.sh (bar phones): the image's ro.oplus.display.screenhole.positon
@@ -332,7 +337,19 @@ fi
 # separate capture, and the reboot back to One UI emptied the buffers. A
 # capture that is already running (started by hand) is kept; otherwise the
 # previous session's files move to oneos_logs.prev. ONEOS_LOGCAT=0 skips it.
+# Size (run 44): 24 rotated files of 32 MiB and the current one, 800 MiB at
+# most (the app's free-space gate counts 1 GiB for logs). Run 44 wrote 56 MiB
+# in 8 minutes after a 45 MiB dump of One UI's history: about 1.7 h at its
+# average rate, 1 h at its peak; with 11 x 20 MiB the rotation would have
+# started dropping the oldest files (One UI's history, then the switch and the
+# guest's boot) after about 26 minutes. The watcher's 90 s round also keeps
+# the files of the boot in $LOGS/head (hard links, below).
 LOGS=/data/local/tmp/oneos_logs
+# LOGCAT_HEAD=1 only for a capture this session starts: a capture already
+# running (by hand, or the last session's within the 120 s before
+# return_to_oneui.sh stops it) keeps its head/, which may hold the boot of an
+# earlier session that its rotation has dropped since.
+LOGCAT_HEAD=0
 if [ "${ONEOS_LOGCAT:-1}" = 1 ]; then
     # pgrep -f matches the same "^logcat ... boot.log" command line in one
     # process. The loop it replaces forked tr and grep for each of ~1100 pids:
@@ -341,11 +358,12 @@ if [ "${ONEOS_LOGCAT:-1}" = 1 ]; then
     # after the switch started (adbd 14:40:51.03, START 14:40:57.03).
     lp=$(pgrep -f "^logcat .*$LOGS/boot.log" 2>/dev/null | head -1)
     if [ -n "$lp" ]; then
-        echo "Logcat capture already running (pid $lp)"
+        echo "Logcat capture already running (pid $lp): kept, its head/ left as it is"
     else
         rm -rf "$LOGS.prev"; [ -d "$LOGS" ] && mv "$LOGS" "$LOGS.prev"
         mkdir -p "$LOGS"
-        $BB setsid logcat -b all -v threadtime -f "$LOGS/boot.log" -r 20480 -n 10 </dev/null >/dev/null 2>&1 &
+        $BB setsid logcat -b all -v threadtime -f "$LOGS/boot.log" -r 32768 -n 24 </dev/null >/dev/null 2>&1 &
+        LOGCAT_HEAD=1
         echo "Logcat capture: $LOGS/boot.log"
     fi
 fi
@@ -654,7 +672,31 @@ SUPP_SVC=$(getprop | sed -n 's/^\[init\.svc\.\([^]]*supplicant[^]]*\)\]: .*/\1/p
 echo "$SUPP_SVC" > "$STAGE/host_supplicant_svc"
 echo "Host wifi_on: $(cat "$STAGE/host_wifi_on"), supplicant service: ${SUPP_SVC:-none} ($(getprop "init.svc.$SUPP_SVC"))"
 
+# CPU caps and heat around the stop (run 44): One UI's thermal control (SIOP,
+# in its system_server) had capped both CPU clusters at 2.112 GHz a second
+# before the stop, and nothing lifted that cap for the whole session. Each
+# cpufreq policy's scaling_max_freq/cpuinfo_max_freq, and the skin
+# temperature from the thermal service (One UI's before the stop, none after)
+# and from the vendor thermal daemon's log (Samsung: "thermal_core: pivot(AP)
+# : 539, skin : 436", tenths of a degree). Read only.
+cpu_caps() {
+    caps=""
+    for p in /sys/devices/system/cpu/cpufreq/policy*; do
+        [ -r "$p/scaling_max_freq" ] || continue
+        caps="$caps ${p##*/} $(cat "$p/scaling_max_freq" 2>/dev/null)/$(cat "$p/cpuinfo_max_freq" 2>/dev/null)"
+    done
+    echo "${caps# }"
+}
+skin_temp() {
+    ts=$(timeout 5 dumpsys thermalservice 2>/dev/null | sed -n '/^Current temperatures from HAL/,/^[^[:space:]]/p' |
+        sed -n 's/.*mValue=\([-0-9.]*\), mType=[0-9]*, mName=SKIN,.*/\1/p' | head -n 1)
+    tc=$(timeout 5 logcat -d -t 4000 -s thermal_core 2>/dev/null | sed -n 's/.* skin : \([0-9][0-9]*\).*/\1/p' | tail -n 1)
+    if [ -n "$ts" ]; then ts="$ts C"; else ts="none"; fi
+    if [ -n "$tc" ]; then tc="$((tc / 10)).$((tc % 10)) C"; else tc="none logged"; fi
+    echo "thermal service $ts, thermal_core $tc"
+}
 echo "=== [4b/6] Stopping the One UI framework ==="
+echo "Before the stop: CPU max/hw kHz: $(cpu_caps); skin: $(skin_temp)"
 pkill -f "while true; do [ \"\$(getprop init.svc.zygote)\"" 2>/dev/null || true
 pkill -f "while true; do for p in \\\$(pidof audioserver cameraserver)" 2>/dev/null || true
 # Gap splash (see the top): once SplashActivity is on screen, freeze One UI's
@@ -701,6 +743,7 @@ kill -9 $(pidof system_server) 2>/dev/null || true
 rm -f "$STAGE/data/guest_audio.flag"
 nohup $BB sh -c "while true; do [ \"\$(getprop init.svc.zygote)\" = \"running\" ] && setprop ctl.stop zygote; [ ! -f $STAGE/data/oneos_host_sf_frozen ] && [ \"\$(getprop init.svc.surfaceflinger)\" = \"running\" ] && setprop ctl.stop surfaceflinger; [ \"\$(getprop init.svc.bootanim)\" = \"running\" ] && setprop ctl.stop bootanim; [ -f $STAGE/data/guest_audio.flag ] && [ \"\$(getprop init.svc.audioserver)\" = \"running\" ] && setprop ctl.stop audioserver; sleep 0.2; done" </dev/null >/dev/null 2>&1 &
 sleep 1
+echo "After the stop: CPU max/hw kHz: $(cpu_caps); skin: $(skin_temp)"
 
 # --- MOUNT PREPARATION ---
 # OneOS safeguards: One UI's /apex mounts must look the same after the
@@ -908,6 +951,10 @@ fi
 # Find N animation (run 30 logcat). The owner wants ColorOS's animation kept,
 # so make sure nothing in the staged /data shadows it.
 rm -f "$STAGE/data/local/bootanimation.zip"
+# return_to_oneui.sh creates data/oneos_rec_stop as its first step (for the
+# screen recording) and nothing removes it unless a recording starts; the
+# session sampler below stops on it, so clear the last session's.
+rm -f "$STAGE/data/oneos_rec_stop"
 
 # Copy inner script and zygote_exec into container data partition. rm the
 # destinations first: a guest could have left them as symlinks into host /data,
@@ -1026,13 +1073,19 @@ while true; do
             timeout 10 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/cmd wifi set-verbose-logging \$WV >/dev/null 2>&1
             echo \"[UI Activator] wifi: verbose logging \$WV -> \$(timeout 10 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/cmd wifi is-verbose-logging 2>&1 | head -1)\"
             # Window-level blur (run 44, owner): guest_props.sh tells SurfaceFlinger
-            # blur is supported, but the Pixel kept "Allow window-level blurs" off
+            # blur is supported, but the Pixel kept \"Allow window-level blurs\" off
             # (Developer options) until the owner turned it on. Allowed once, on a
             # stage's first boot (a marker in the guest's data); a later choice in
             # Developer options stays. ColorOS guests and ONEOS_GUEST_BLUR=0: untouched.
-            if [ $GUEST_OPLUS = 0 ] && [ $GUEST_BLUR = 1 ] && [ ! -f $STAGE/data/oneos_blur_default ]; then
+            # The marker is in data the guest can write, and this shell is host
+            # root: it is made with mkdir and checked with -e and -L, never with
+            # touch or -f, which follow a link the guest may have left there to
+            # a path in One UI's /data (an older marker, a file, still counts).
+            if [ $GUEST_OPLUS = 0 ] && [ -L $STAGE/data/oneos_blur_default ]; then
+                echo \"[UI Activator] window blur: data/oneos_blur_default is a link, not made by OneOS; left alone\"
+            elif [ $GUEST_OPLUS = 0 ] && [ $GUEST_BLUR = 1 ] && [ ! -e $STAGE/data/oneos_blur_default ]; then
                 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/settings put global disable_window_blurs 0 >/dev/null 2>&1 &&
-                    touch $STAGE/data/oneos_blur_default &&
+                    mkdir $STAGE/data/oneos_blur_default 2>/dev/null &&
                     echo \"[UI Activator] window blur: allowed (disable_window_blurs 0, first boot of this stage)\"
             fi
             # Density and fold line of the inner panel (run 43), before HOME so the
@@ -1165,6 +1218,32 @@ while true; do
             fi
             echo \"[UI Activator] refresh: min \$($BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/settings get system min_refresh_rate) peak \$($BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/settings get system peak_refresh_rate); brightness \$($BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/settings get system screen_brightness)\"
             echo '[UI Activator] Home activated!'
+            # Google Dialer and Nearby devices (run 44): 50 SecurityExceptions
+            # (DialerAudioModeProvider, getRemoteAlias: Need
+            # android.permission.BLUETOOTH_CONNECT) in the first call, until the
+            # owner allowed it in a dialog in the middle of that call. Granted
+            # once per stage (a marker in the guest's data, like the blur
+            # default), so a later choice in the guest stays. Not BLUETOOTH_SCAN:
+            # nothing in run 44 asked for it. Pixel guests only; the guest's own
+            # package manager, nothing of One UI's. After HOME: it does not hold
+            # up the first screen, and no call comes that early. The marker is
+            # made and checked like the blur one (mkdir, -e and -L).
+            if [ $GUEST_OPLUS = 0 ]; then
+                DST=''
+                if [ -L $STAGE/data/oneos_dialer_bt ]; then
+                    DST='data/oneos_dialer_bt is a link, not made by OneOS; nothing granted'
+                elif [ -e $STAGE/data/oneos_dialer_bt ]; then
+                    DST='granted on an earlier boot of this stage, left to the guest'
+                elif ! timeout 20 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/pm path com.google.android.dialer >/dev/null 2>&1; then
+                    DST='com.google.android.dialer not installed (or pm path did not answer in 20 s), nothing granted'
+                elif DR=\$(timeout 20 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/pm grant --user 0 com.google.android.dialer android.permission.BLUETOOTH_CONNECT 2>&1); then
+                    mkdir $STAGE/data/oneos_dialer_bt 2>/dev/null
+                    DST='BLUETOOTH_CONNECT granted (once per stage)'
+                else
+                    DST=\"pm grant BLUETOOTH_CONNECT failed: \$(echo \"\$DR\" | tr '\n' ' ' | cut -c1-200)\"
+                fi
+                echo \"[UI Activator] dialer: \$DST; now \$(timeout 20 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys package com.google.android.dialer 2>/dev/null | grep -m 1 -o 'android.permission.BLUETOOTH_CONNECT: granted=[a-z]*' || echo 'BLUETOOTH_CONNECT state not read')\"
+            fi
             # Fold test (fold layout only). On every lid switch event record what
             # the guest did: device state, layout, both touch mappers and
             # backlights, a screenshot of display 0, and after folding 10 s of
@@ -1396,6 +1475,48 @@ while true; do
 done
 " </dev/null >/data/local/tmp/ui_activator.log 2>&1 &
 
+# Session sampler (run 44: nothing was recorded after the 90 s round; window
+# blur went off and on with the guest's thermal status, not the setting, while
+# One UI's last CPU cap stayed). Every 30 s until the return, one line in
+# $STAGE/diag_series.txt: time, the guest's thermal status and skin
+# temperature (its thermal service on the shared HAL), each cpufreq policy's
+# scaling_max_freq/cpuinfo_max_freq, WindowManager's mBlurEnabled,
+# disable_window_blurs, battery level and status. Read only, each guest call
+# with a timeout; until the guest's system_server runs only the kernel's
+# values. It stops once return_to_oneui.sh has started (data/oneos_rec_stop,
+# its first step; its pkill of system_server matches this command line too)
+# or the guest's namespace record is gone. Out of the app cgroup, like the
+# watcher, so it outlives the app that started the switch.
+$BB sh -c "
+    echo \$\$ > /sys/fs/cgroup/cgroup.procs 2>/dev/null
+    F=$STAGE/diag_series.txt
+    echo \"# \$(date) OneOS session sampler, one line every 30 s: time, thermal status, skin C, policyN=scaling_max_freq/cpuinfo_max_freq kHz, mBlurEnabled, disable_window_blurs, battery %,status\" > \$F
+    while true; do
+        [ -f $STAGE/data/oneos_rec_stop ] && { echo \"# \$(date +%T) the return started: sampler stopped\" >> \$F; exit 0; }
+        [ -s $STAGE/guest_mntns ] || { echo \"# \$(date +%T) no guest namespace record: sampler stopped\" >> \$F; exit 0; }
+        t0=\$(date +%s)
+        P=\$(pidof system_server | awk '{print \$1}')
+        st=''; sk=''; bl=''; dw=''
+        if [ -n \"\$P\" ]; then
+            TH=\$(timeout 10 $BB nsenter -t \$P -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys thermalservice 2>/dev/null)
+            st=\$(echo \"\$TH\" | sed -n 's/^Thermal Status: *\([0-9][0-9]*\).*/\1/p' | head -n 1)
+            sk=\$(echo \"\$TH\" | sed -n '/^Current temperatures from HAL/,/^[^[:space:]]/p' | sed -n 's/.*mValue=\([-0-9.]*\), mType=[0-9]*, mName=SKIN,.*/\1/p' | head -n 1)
+            bl=\$(timeout 10 $BB nsenter -t \$P -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys window windows 2>/dev/null | grep -m 1 -o 'mBlurEnabled=[a-z]*' | sed 's/.*=//')
+            dw=\$(timeout 10 $BB nsenter -t \$P -m /system/bin/sh /data/oneos_genv.sh /system/bin/settings get global disable_window_blurs 2>/dev/null)
+        fi
+        c=''
+        for p in /sys/devices/system/cpu/cpufreq/policy*; do
+            [ -r \$p/scaling_max_freq ] && c=\"\$c \${p##*/}=\$(cat \$p/scaling_max_freq 2>/dev/null)/\$(cat \$p/cpuinfo_max_freq 2>/dev/null)\"
+        done
+        bc=\$(cat /sys/class/power_supply/battery/capacity 2>/dev/null)
+        bs=\$(cat /sys/class/power_supply/battery/status 2>/dev/null | tr ' ' _)
+        echo \"\$(date +%T) thermal=\${st:--} skin=\${sk:--}\$c blur=\${bl:--} disable_window_blurs=\${dw:--} battery=\${bc:-?}%,\${bs:-?}\" >> \$F
+        s=\$((t0 + 30 - \$(date +%s))); [ \$s -gt 0 ] || s=1
+        sleep \$s
+    done
+" </dev/null >/dev/null 2>&1 &
+echo "Session sampler: every 30 s to $STAGE/diag_series.txt"
+
 # OneOS dead-man switch. If the guest is not booting, put One UI back by itself:
 # a stuck guest otherwise leaves a black screen and no network (so no remote
 # adb either) until a forced reboot, which also drops temp root.
@@ -1466,6 +1587,19 @@ if [ "$RETURN_MAX" -gt 0 ]; then
             dname=''
             case \$total in 20|40|90) dname=\$total ;; esac
             [ $SESSION_MAX -gt 0 ] && [ \$total -eq $((SESSION_MAX - 20)) ] && dname=final
+            # Keep the boot (run 44): once the capture is full its rotation
+            # drops the oldest files first, One UI's history, the switch and the
+            # guest's boot. In the 90 s round the newest six files (all of the
+            # boot at run 44's rates, 192 MiB at most) get a second name in
+            # $LOGS/head: hard links, no copy, and no space used until the
+            # rotation deletes their first name. This session's capture only.
+            if [ \"\$dname\" = 90 ] && [ $LOGCAT_HEAD = 1 ]; then
+                rm -rf $LOGS/head && mkdir -p $LOGS/head
+                for f in $LOGS/boot.log $LOGS/boot.log.0[1-5]; do
+                    [ -f \$f ] && $BB ln -f \$f $LOGS/head/ 2>/dev/null
+                done
+                echo \"\$(date) logcat capture: \$(ls $LOGS/head 2>/dev/null | wc -l) files of the boot kept in $LOGS/head (hard links)\"
+            fi
             if [ -n \"\$dname\" ]; then
                 SFP=\$(pidof surfaceflinger | awk '{print \$1}')
                 if [ -n \"\$SFP\" ]; then
@@ -1489,7 +1623,7 @@ if [ "$RETURN_MAX" -gt 0 ]; then
                     # Bluetooth (run 43: A2DP and HFP went to a made-up identity
                     # address): active devices, bond states and identity addresses.
                     timeout 20 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys bluetooth_manager > \$D/bluetooth_manager.txt 2>&1
-                    cp $STAGE/data/audio_keeper.log $STAGE/data/call_audio.log \$D/ 2>/dev/null
+                    cp $STAGE/data/audio_keeper.log $STAGE/data/call_audio.log $STAGE/data/oneos_a2dp.log \$D/ 2>/dev/null
                     timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys SurfaceFlinger --list > \$D/layers.txt 2>&1
                     # Does each SurfaceFlinger -> composer transaction arrive at all?
                     for f in failed_transaction_log transaction_log stats; do timeout 5 cat /dev/binderfs/binder_logs/\$f > \$D/binder_\$f.txt 2>&1; done

@@ -79,7 +79,7 @@
     <string name="switch_starting">Starting…</string>
     <string name="switch_launched">Started</string>
     <string name="switch_not_started">Not started</string>
-    <string name="switch_dry_dialog_message">One UI closes for about a minute while root sets %1$s up and checks it. Then the phone restarts into One UI. OneOS closes with One UI.</string>
+    <string name="switch_dry_dialog_message">One UI closes for about a minute while root sets %1$s up and checks it. Then One UI comes back, usually without a restart. OneOS closes with One UI.</string>
     <string name="switch_go_dialog_title">Switch to %1$s now?</string>
 
     <!-- Last session: the texts that did not change (the rest: strings_advanced.xml) -->

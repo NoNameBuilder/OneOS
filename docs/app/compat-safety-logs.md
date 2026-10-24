@@ -365,7 +365,7 @@ so the scripts stay simple.
 
 | File | Writer |
 | --- | --- |
-| `/data/local/tmp/oneos_logs/boot.log*` (logcat -b all, 10 x 20 MB) | `oneos_switch.sh` |
+| `/data/local/tmp/oneos_logs/boot.log*` (logcat -b all, 25 x 32 MB; `head/`: the files of the boot, hard links made in the 90 s round) | `oneos_switch.sh` |
 | `/data/local/tmp/oneos_logs.prev/` (the session before) | `oneos_switch.sh` |
 | `$STAGE/takeover_app.log` | app launch |
 | `$STAGE/data/takeover.log` (inside the guest) | `guest_start.sh` |
@@ -515,8 +515,8 @@ and in the app before every run); root writes no file. In order:
 | `logs.stage` | `$STAGE/*.log` (takeover_app, auto_return, manual_return, apex_watch, net_watch, gap_splash, ...) | `stage/` |
 | `logs.guest` | `$STAGE/data/*.log` (takeover, call_audio, audio_keeper, backlight, vold, idmap, ...) | `guest/` |
 | `logs.host` | `ui_activator.log`, `adb_watchdog.log`, `ims_watchdog.log`, `restore_app.log` in `/data/local/tmp` | `host/` |
-| `logs.diag` | `$STAGE/diag_*/*` with the endings `.txt`, `.log`, `.xml`, `.err` only | `diag/` |
-| `logs.capture` | `/data/local/tmp/oneos_logs/boot.log*` (the session's full capture) | `capture/` |
+| `logs.diag` | `$STAGE/diag_series.txt` (the 30 s session sampler) and `$STAGE/diag_*/*` with the endings `.txt`, `.log`, `.xml`, `.err` only | `diag/` |
+| `logs.capture` | `/data/local/tmp/oneos_logs/head/boot.log*` no longer in the capture (the boot), then `/data/local/tmp/oneos_logs/boot.log*` (the session's full capture) | `capture/` |
 
 Redaction happens as the stream arrives, line by line
 (`:core:root` `RedactingOutputStream`), so no raw line ever reaches the app's

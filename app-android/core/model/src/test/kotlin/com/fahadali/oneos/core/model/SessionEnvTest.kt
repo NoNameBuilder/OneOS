@@ -26,6 +26,7 @@ class SessionEnvTest {
             ONEOS_GUEST_COMPACT_WINDOW=1
             ONEOS_GUEST_WALLPAPER_GRID=1
             ONEOS_GUEST_HIDE_GMS=0
+            ONEOS_RETURN_MODE=inplace
 
             """.trimIndent(),
             SessionEnv.generate(Profiles.F8U),
@@ -50,6 +51,7 @@ class SessionEnvTest {
             ONEOS_GUEST_COMPACT_WINDOW=0
             ONEOS_GUEST_WALLPAPER_GRID=0
             ONEOS_GUEST_HIDE_GMS=0
+            ONEOS_RETURN_MODE=inplace
 
             """.trimIndent(),
             SessionEnv.generate(Profiles.S_ULTRA_8850),
@@ -83,7 +85,8 @@ class SessionEnvTest {
             for (k in SessionEnv.FORBIDDEN.keys) assertFalse("${p.id} $k", text.contains(k))
             assertFalse(text.contains(SessionEnv.FORBIDDEN_PREFIX))
             assertFalse(text.contains("ONEOS_LOGCAT=0"))
-            assertFalse(text.contains("RETURN"))
+            // The only return key: in place, never MAX/KEYS (0.4.7).
+            assertEquals(listOf("ONEOS_RETURN_MODE=inplace"), text.lines().filter { "RETURN" in it })
             assertFalse(text.contains("PREPARE_ONLY"))
             // Only characters that need no quoting when root sources the file.
             assertTrue(text.all { it == '\n' || it.isLetterOrDigit() || it in "=_./-" })
@@ -94,6 +97,8 @@ class SessionEnvTest {
     fun allowListValuesCannotTurnTheWayBackOff() {
         val allowed = SessionEnv.ALLOWED
         assertFalse(allowed.containsKey("ONEOS_RETURN_MAX"))
+        assertFalse(allowed.containsKey("ONEOS_RETURN_KEYS"))
+        assertFalse(allowed.getValue("ONEOS_RETURN_MODE").matches("reboot"))
         assertFalse(allowed.getValue("ONEOS_LOGCAT").matches("0"))
         assertFalse(allowed.getValue("ONEOS_GUEST_FORM").matches("tablet"))
         assertFalse(allowed.getValue("ONEOS_SPLASH_COMPONENT").matches("com.wewaffles.onelineage/.SplashActivity"))
@@ -110,7 +115,10 @@ class SessionEnvTest {
 
         assertTrue(problems(good + "ONEOS_RETURN_MAX=0\n").contains("forbidden key ONEOS_RETURN_MAX"))
         assertTrue(problems(good + "ONEOS_RETURN_KEYS=0\n").contains("forbidden key ONEOS_RETURN_KEYS"))
-        assertTrue(problems(good + "ONEOS_RETURN_MODE=inplace\n").contains("forbidden key ONEOS_RETURN_MODE"))
+        // 0.4.7: the return is always in place (a failed check reboots); nothing else may be asked for.
+        assertTrue(good.contains("ONEOS_RETURN_MODE=inplace\n"))
+        assertTrue(problems(good.replace("ONEOS_RETURN_MODE=inplace", "ONEOS_RETURN_MODE=reboot")).isNotEmpty())
+        assertTrue(problems(good.replace("ONEOS_RETURN_MODE=inplace\n", "")).contains("ONEOS_RETURN_MODE missing"))
         assertTrue(problems(good + "ONEOS_STOCK_SF=1\n").contains("forbidden key ONEOS_STOCK_SF"))
         assertTrue(problems(good + "ONEOS_KEEP_FOLD_LAYOUT=1\n").contains("forbidden key ONEOS_KEEP_FOLD_LAYOUT"))
         assertTrue(problems(good + "ONEOS_PREPARE_ONLY=1\n").contains("forbidden key ONEOS_PREPARE_ONLY"))
@@ -122,7 +130,7 @@ class SessionEnvTest {
         assertTrue(problems(good.removeSuffix("\n")).contains("must end with a newline"))
         assertTrue(problems(good.replace("\n", "\r\n")).isNotEmpty())
         assertTrue(problems("# comment\n$good").contains("line 1 is not KEY=VALUE"))
-        assertTrue(problems("$good\n").contains("line 15 is not KEY=VALUE"))
+        assertTrue(problems("$good\n").contains("line 16 is not KEY=VALUE"))
         assertTrue(problems(good.replace("ONEOS_APP=1", "export ONEOS_APP=1")).isNotEmpty())
         assertTrue(problems(good.replace("ONEOS_GUEST_FOLD=off", "ONEOS_GUEST_FOLD=\$(reboot)")).isNotEmpty())
         // A fold value in an S Ultra file: the profile decides the form.
@@ -169,7 +177,7 @@ class SessionEnvTest {
             assertTrue(SessionEnv.validate(text.replace("${SessionEnv.HIDE_GMS}=0\n", ""), image = hideable).contains("${SessionEnv.HIDE_GMS} missing"))
         }
         assertEquals(emptyList<ImageRef>(), Images.ALL.filter { it.gmsHideable })
-        assertEquals("ONEOS_GUEST_HIDE_GMS", SessionEnv.ALLOWED.keys.last())
+        assertEquals("ONEOS_GUEST_HIDE_GMS", SessionEnv.ALLOWED.keys.toList().dropLast(1).last())
     }
 
     /** Every knob the file sets is read by the session scripts under that exact name. */
