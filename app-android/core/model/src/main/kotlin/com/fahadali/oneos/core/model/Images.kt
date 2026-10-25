@@ -92,8 +92,8 @@ data class ImageRef(
 /**
  * The built-in image table. Sizes and hashes verified on the server on
  * 2026-10-22 (the Pixel 11 Fold image on 2026-10-24): the gunzip of each
- * upload is byte-identical to the server image. 0.3.7: the Find X9 Ultra IN
- * build (`coloros17-findx9u-in`) is gone, its server build was deleted.
+ * upload is byte-identical to the server image. 0.3.7 dropped the Find X9
+ * Ultra IN build (`coloros17-findx9u-in`); 0.4.11 takes it again.
  */
 object Images {
     /** Where the images come from: the README (this repository does not host them). */
@@ -104,7 +104,9 @@ object Images {
 
     const val ID_FIND_N6 = "coloros17-findn6"
     const val ID_FIND_X9U = "coloros17-findx9u"
+    const val ID_FIND_X9U_IN = "coloros17-findx9u-in"
     const val ID_PIXEL_YOGI = "pixel11fold-yogi"
+    const val ID_PIXEL_KODIAK = "pixel11pro-kodiak"
 
     /** Where root stages the unpacked image. */
     const val STAGE_NAME = "system.raw"
@@ -162,6 +164,35 @@ object Images {
     )
 
     /**
+     * The global (India) build of the same phone, back in 0.4.11 (0.3.3-0.3.6
+     * took it; 0.3.7 dropped it when its server build was deleted for space):
+     * Google's mainline modules, Play services and the Play Store in
+     * my_product (owner: "IN build is just better"; friends run it). The
+     * upload of 2026-10-25 is the 0.3.3 file, byte for byte.
+     */
+    val FIND_X9U_IN = ImageRef(
+        id = ID_FIND_X9U_IN,
+        label = "ColorOS 17, Find X9 Ultra IN build",
+        shortName = "Find X9 Ultra IN",
+        name = "ColorOS 17",
+        variant = "global build",
+        blurb = "OPPO's global system from the Find X9 Ultra, with Google Play and the Play Store.",
+        downloadUrl = SHARED_FOLDER_URL,
+        sdk = 37,
+        buildId = "CP2A.260605.016",
+        gzName = "OneOS_ColorOS17_FindX9Ultra_IN.img.gz",
+        gzBytes = 5_882_128_321L,
+        gzSha256 = "413380426cdff8b5e760f1424895fc5b43e7a6ffe5f889e0406e437590c0d04e",
+        rawBytes = 12_069_945_344L,
+        rawSha256 = "a36ef550f4b2530fb9c7c6d363180d9eb4437e0497ebc87292697e4bf2a580b0",
+        testedOn = null,
+        cpuRequired = emptyList(),
+        cpuUsedByApps = listOf("sve2", "sme"),
+        googleServices = true,
+        family = SystemFamily.COLOROS,
+    )
+
+    /**
      * Google's Pixel 11 Fold system (yogi, `google/yogi/yogi:17/CD1A.261005.003.B1`),
      * built with MysticGSI (`scripts/build-gsi.sh --type pixel`,
      * `out/oneos-pixel-yogi.img`; docs/pixel-guest.md). Runs 41-44 booted it on
@@ -199,28 +230,52 @@ object Images {
         family = SystemFamily.PIXEL,
     )
 
-    val ALL: List<ImageRef> = listOf(FIND_N6, FIND_X9U, PIXEL_YOGI)
+    /**
+     * Google's Pixel 11 Pro system (kodiak, `CD1A.261005.003.B1`, the same build
+     * as the Pixel 11 Fold's), from 0.4.10 for the Galaxy S26 Ultra: the factory
+     * image, MysticGSI `--type pixel --no-debloat`, then Pixel Camera,
+     * PixelCameraServices, PixelDisplayService and grilservice removed, as for the
+     * Fold's full image. Its system code uses SVE in every process (RefBase's
+     * constructor), so only SM8850 phones take it. Untested.
+     */
+    val PIXEL_KODIAK = ImageRef(
+        id = ID_PIXEL_KODIAK,
+        label = "Pixel 11 Pro, kodiak build",
+        shortName = "Pixel 11 Pro",
+        name = "Pixel 11 Pro",
+        variant = null,
+        blurb = "Google's system from the Pixel 11 Pro, with Google Play and Google's apps.",
+        downloadUrl = SHARED_FOLDER_URL,
+        sdk = 37,
+        buildId = "CD1A.261005.003.B1",
+        gzName = "OneOS_Pixel11Pro_Full_S26U.img.gz",
+        gzBytes = 3_266_985_222L,
+        gzSha256 = "ee9b6005a086627220841618ea2edaa278c4e153460f7f947fc7fc9dea8d727c",
+        rawBytes = 6_529_871_872L,
+        rawSha256 = "ac661a520263fa73a2b9996f19763350457b1558863d1dc15326a365ce1784c6",
+        testedOn = null,
+        cpuRequired = listOf("sve", "sve2"),
+        cpuUsedByApps = emptyList(),
+        googleServices = true,
+        presentsGms = true,
+        family = SystemFamily.PIXEL,
+    )
+
+    val ALL: List<ImageRef> = listOf(FIND_N6, FIND_X9U, FIND_X9U_IN, PIXEL_YOGI, PIXEL_KODIAK)
 
     fun byId(id: String, images: List<ImageRef> = ALL): ImageRef? = images.firstOrNull { it.id == id }
 
     /**
      * Images earlier builds took and this one no longer sets up, for their
      * names only (an old stage's marker, a copy set aside, the last session, a
-     * remembered download): 0.3.7 dropped the Find X9 Ultra IN build.
+     * remembered download). None since 0.4.11: the Find X9 Ultra IN build,
+     * dropped in 0.3.7, is back in [ALL].
      */
-    val RETIRED: List<RetiredImage> = listOf(
-        RetiredImage(
-            id = "coloros17-findx9u-in",
-            shortName = "Find X9 Ultra IN",
-            gzName = "OneOS_ColorOS17_FindX9Ultra_IN.img.gz",
-            gzBytes = 5_882_128_321L,
-            rawBytes = 12_069_945_344L,
-        ),
-    )
+    val RETIRED: List<RetiredImage> = emptyList()
 
-    /** "Find N6", "Find X9 Ultra IN" (retired), or the id itself when no build knew it. */
-    fun shortName(id: String, images: List<ImageRef> = ALL): String =
-        byId(id, images)?.shortName ?: RETIRED.firstOrNull { it.id == id }?.shortName ?: id
+    /** "Find N6", a retired image's name, or the id itself when no build knew it. */
+    fun shortName(id: String, images: List<ImageRef> = ALL, retired: List<RetiredImage> = RETIRED): String =
+        byId(id, images)?.shortName ?: retired.firstOrNull { it.id == id }?.shortName ?: id
 
     /** The image whose .gz has exactly this size (`OpenableColumns.SIZE`). */
     fun byGzSize(bytes: Long, images: List<ImageRef> = ALL): ImageRef? = images.firstOrNull { it.gzBytes == bytes }
@@ -322,7 +377,12 @@ object ImageIdentifier {
         }
     }
 
-    fun identify(check: ImageFileCheck, profile: PhoneProfile?, images: List<ImageRef> = Images.ALL): ImageIdentity {
+    fun identify(
+        check: ImageFileCheck,
+        profile: PhoneProfile?,
+        images: List<ImageRef> = Images.ALL,
+        retiredImages: List<RetiredImage> = Images.RETIRED,
+    ): ImageIdentity {
         val name = check.displayName?.takeIf { it.isNotBlank() }?.let { "'${it.take(120)}'" } ?: "This file"
         val size = check.hashedBytes ?: check.bytes
         val wantText = accepts(profile, images)
@@ -336,7 +396,7 @@ object ImageIdentifier {
         val bySize = images.filter { it.gzBytes == size }
         if (bySize.isEmpty()) {
             val raw = Images.byRawSize(size, images)
-            val retired = Images.RETIRED.firstOrNull { it.gzBytes == size }
+            val retired = retiredImages.firstOrNull { it.gzBytes == size }
             return if (raw == null && retired != null) {
                 ImageIdentity(
                     ImageState.UNKNOWN, null,
@@ -404,7 +464,12 @@ object ImageIdentifier {
      * [ImageState.NOT_CHECKED]): root hashes it in keep-raw before anything
      * uses it, and moves it to the attic when it differs.
      */
-    fun identifyStaged(raw: StagedRaw, profile: PhoneProfile?, images: List<ImageRef> = Images.ALL): ImageIdentity {
+    fun identifyStaged(
+        raw: StagedRaw,
+        profile: PhoneProfile?,
+        images: List<ImageRef> = Images.ALL,
+        retiredImages: List<RetiredImage> = Images.RETIRED,
+    ): ImageIdentity {
         val wantText = accepts(profile, images)
         val size = raw.bytes ?: return ImageIdentity(
             ImageState.UNKNOWN, null,
@@ -412,7 +477,7 @@ object ImageIdentifier {
         )
         val bySize = images.filter { it.rawBytes == size }
         if (bySize.isEmpty()) {
-            val retired = Images.RETIRED.firstOrNull { it.rawBytes == size }
+            val retired = retiredImages.firstOrNull { it.rawBytes == size }
             return ImageIdentity(
                 ImageState.UNKNOWN, null,
                 if (retired != null) {

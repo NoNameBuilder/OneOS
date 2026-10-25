@@ -28,18 +28,22 @@ fun sha256(f: File): String {
 // assets/oneos/files/<sha256>; per-set lists in assets/oneos/sets/.
 val repoRoot: File = rootProject.projectDir.parentFile
 val packagesDir: File = rootProject.file("packages")
-// OneOSGuest.apk (app-android/guest, the in-guest "Back to One UI" app) is
-// left out of the ColorOS sets (their files stay as they are); the Pixel set
-// carries it, and guest_prepare.sh puts it in the guest's /oem/app.
+// Every set carries OneOSGuest.apk (app-android/guest, the in-guest "Back to
+// One UI" app; the ColorOS sets since their 2026-10-25 rebuild), and
+// guest_prepare.sh puts it in the guest's /oem/app.
 val packageSets: Map<String, Pair<File, List<String>>> = linkedMapOf(
     // Find N6 image, Z Fold (F8U). tethering_payload.img is never mounted.
-    "n6-f8u" to (File(repoRoot, "out/overlays") to listOf("tethering_payload.img", "OneOSGuest.apk")),
+    "n6-f8u" to (File(repoRoot, "out/overlays_n6_r50") to listOf("tethering_payload.img")),
     // Find X9 Ultra image, S Ultra: no fold grid either.
-    "x9u-sultra" to (File(repoRoot, "out/overlays_x9u") to listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk", "OneOSGuest.apk")),
+    "x9u-sultra" to (File(repoRoot, "out/overlays_x9u_r50") to listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk")),
+    // Find X9 Ultra IN image (0.3.3-0.3.6, again from 0.4.11), the bar phones:
+    // the CN set's files (shared by hash) and its cell broadcast module.
+    "x9u-in-sultra" to (File(repoRoot, "out/overlays_x9u_in_r50") to listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk")),
     // Pixel 11 Fold image (0.3.7), Z Fold (F8U): everything a Pixel session uses,
-    // OneOSGuest.apk included. (0.3.3-0.3.6 had the Find X9 Ultra IN sets from
-    // out/overlays_x9u_in; that build was deleted from the server.)
+    // OneOSGuest.apk included.
     "pixel-f8u" to (File(repoRoot, "out/overlays_pixel_yogi") to listOf("tethering_payload.img")),
+    // Pixel 11 Pro image (0.4.10), Galaxy S26 Ultra: the same files from that image.
+    "pixel-sultra" to (File(repoRoot, "out/overlays_pixel_kodiak") to listOf("tethering_payload.img")),
 )
 // Session scripts copied from switcher/assets at build time (plus the expected
 // installd table). oneos_tunnel.sh (the server tunnel) and 7zz are never shipped.
@@ -216,8 +220,8 @@ android {
         // 0.3.4: the Galaxy S25 profile, and OneOS Probe as its own app (flavor probe).
         // 0.3.5: Old stages (delete the stages Prepare moved aside).
         // 0.3.7: the Pixel 11 Fold image and its set on the Fold; the Find X9 Ultra IN image is gone.
-        versionCode = 19
-        versionName = "0.4.7"
+        versionCode = 26
+        versionName = "0.4.13"
     }
 
     // One codebase, two apps (docs/app/DESIGN.md, 0.3.4): "full" is OneOS, the app

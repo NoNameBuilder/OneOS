@@ -4,7 +4,7 @@ import java.util.Locale
 
 /** What a staged file is for; decides its mode and how the scripts use it (guest_prepare.sh). */
 enum class FileRole {
-    /** services / oplus-services: carry the storage, installd and sysrq guards; pinned by guards.txt. */
+    /** services / oplus-services: carry the storage, installd, sysrq and the other guards; pinned by guards.txt. */
     GUARD_JAR,
     /**
      * `vold_patched`: the guest's own vold registered as "gvld" (run 44,
@@ -74,7 +74,7 @@ data class PackageSet(
     val files: List<PackageFile>,
     /** Files in [sourceDir] this set leaves out on purpose. */
     val omitted: List<String>,
-    /** Total bytes of [files] (out/ of 2026-10-22; the Pixel set 2026-10-24), for the free-space gate. */
+    /** Total bytes of [files] (the Pixel set of 2026-10-24, the ColorOS sets of 2026-10-25), for the free-space gate. */
     val approxBytes: Long,
     /**
      * The set stages OneOS's in-guest app (Back to One UI in the other
@@ -82,7 +82,7 @@ data class PackageSet(
      * staged `OneOSGuest.apk` into the guest's /oem/app (`ONEOS_GUEST_APP`,
      * default on, which session.env cannot set) and oneos_switch.sh's watcher
      * takes its request. True exactly when the set carries
-     * [PackageSets.GUEST_APP] (0.3.7: the Pixel set; the ColorOS sets leave it out).
+     * [PackageSets.GUEST_APP] (the Pixel set since 0.3.7, the ColorOS sets since 0.4.8).
      */
     val hasReturnApp: Boolean = false,
 ) {
@@ -111,9 +111,9 @@ data class PackageSet(
 
     /**
      * Problems with this set's guards.txt against the set's own hashes: it
-     * must list every guard file ([PackageFile.GUARDED]: the guard jars and,
-     * in the Pixel set, the guest vold's vold_patched and
-     * service.incremental_patched.so), nothing else, with the file's SHA-256
+     * must list every guard file ([PackageFile.GUARDED]: the guard jars and
+     * the guest vold's vold_patched and service.incremental_patched.so),
+     * nothing else, with the file's SHA-256
      * (what oneos_switch.sh and guest_prepare.sh check before binding them).
      * A set with the GmsCore payload also needs guards.txt's comment lines to
      * name the guards Google services need ([PackageSets.GMS_GUARDS]), or
@@ -146,7 +146,9 @@ data class PackageSet(
 object PackageSets {
     const val ID_N6_F8U = "n6-f8u"
     const val ID_X9U_SULTRA = "x9u-sultra"
+    const val ID_X9U_IN_SULTRA = "x9u-in-sultra"
     const val ID_PIXEL_F8U = "pixel-f8u"
+    const val ID_PIXEL_SULTRA = "pixel-sultra"
 
     /** Never mounted (guest_prepare.sh only keeps the host module); left out of every set. */
     const val TETHERING = "tethering_payload.img"
@@ -183,10 +185,19 @@ object PackageSets {
         "configinfrastructure",
     )
 
-    /** The ColorOS sets' files (root's SET_COMMON). */
+    /**
+     * The ColorOS sets' files (root's SET_COMMON). Since 0.4.8 (rebuilt
+     * 2026-10-25 with every guard the Pixel set has) also the guest vold as
+     * "gvld" for ColorOS 17 CP2A.260605.016 (vold_patched,
+     * service.incremental_patched.so; oplus-services_patched.jar looks up
+     * gvld too) and OneOS's in-guest app.
+     */
     private val COMMON: List<PackageFile> = listOf(
         PackageFile("services_patched.jar", FileRole.GUARD_JAR),
         PackageFile("oplus-services_patched.jar", FileRole.GUARD_JAR),
+        PackageFile("vold_patched", FileRole.GUARD_EXECUTABLE),
+        PackageFile("service.incremental_patched.so", FileRole.GUARD_LIBRARY),
+        PackageFile(GUEST_APP, FileRole.GUEST_APP),
         PackageFile("ims-ext-common_patched.jar", FileRole.FRAMEWORK_JAR),
         PackageFile("oplus-telephony-common_patched.jar", FileRole.FRAMEWORK_JAR),
         PackageFile("surfaceflinger_patched", FileRole.SURFACEFLINGER),
@@ -196,20 +207,47 @@ object PackageSets {
     val N6_F8U = PackageSet(
         id = ID_N6_F8U,
         imageId = Images.ID_FIND_N6,
-        sourceDir = "out/overlays",
+        sourceDir = "out/overlays_n6_r50",
         files = COMMON + PackageFile(WALLPAPER_GRID_RRO, FileRole.RRO),
         omitted = listOf(TETHERING),
-        approxBytes = 264_053_591L,
+        approxBytes = 267_168_254L,
+        hasReturnApp = true,
     )
 
     val X9U_SULTRA = PackageSet(
         id = ID_X9U_SULTRA,
         imageId = Images.ID_FIND_X9U,
-        sourceDir = "out/overlays_x9u",
+        sourceDir = "out/overlays_x9u_r50",
         files = COMMON,
         omitted = listOf(TETHERING, WALLPAPER_GRID_RRO),
-        approxBytes = 264_033_307L,
+        approxBytes = 267_147_970L,
+        hasReturnApp = true,
     )
+
+    /** Find X9 Ultra IN image, the bar phones (0.4.11): the CN set's files and its cell broadcast module. */
+    val X9U_IN_SULTRA = PackageSet(
+        id = ID_X9U_IN_SULTRA,
+        imageId = Images.ID_FIND_X9U_IN,
+        sourceDir = "out/overlays_x9u_in_r50",
+        files = COMMON + PackageFile(CELLBROADCAST, FileRole.APEX_PAYLOAD),
+        omitted = listOf(TETHERING, WALLPAPER_GRID_RRO),
+        approxBytes = 327_686_210L,
+        hasReturnApp = true,
+    )
+
+    /** The Pixel sets' files (root's SET_PIXEL): the same for every Pixel image. */
+    private val PIXEL_FILES: List<PackageFile> = listOf(
+        PackageFile("services_patched.jar", FileRole.GUARD_JAR),
+        PackageFile("vold_patched", FileRole.GUARD_EXECUTABLE),
+        PackageFile("service.incremental_patched.so", FileRole.GUARD_LIBRARY),
+        PackageFile("guards.txt", FileRole.GUARDS),
+        PackageFile("oneos-telephony.jar", FileRole.INJECTION_JAR),
+        PackageFile("oneos-telephony.sha256", FileRole.INJECTION_SHA256),
+        PackageFile("OneOSPhoneInjection.apk", FileRole.RRO),
+        PackageFile("OneOSPixelStatusBar.apk", FileRole.RRO),
+        PackageFile(GUEST_APP, FileRole.GUEST_APP),
+    ) + (COMMON_PAYLOADS + listOf("cellbroadcast", "bt", "nfcservices", "telephonycore", "conscrypt", "profiling", "gmssystem"))
+        .map { PackageFile("${it}_payload.img", FileRole.APEX_PAYLOAD) }
 
     /**
      * Pixel 11 Fold image, Z Fold (F8U) (0.3.7), from out/overlays_pixel_yogi:
@@ -228,24 +266,28 @@ object PackageSets {
         id = ID_PIXEL_F8U,
         imageId = Images.ID_PIXEL_YOGI,
         sourceDir = "out/overlays_pixel_yogi",
-        files = listOf(
-            PackageFile("services_patched.jar", FileRole.GUARD_JAR),
-            PackageFile("vold_patched", FileRole.GUARD_EXECUTABLE),
-            PackageFile("service.incremental_patched.so", FileRole.GUARD_LIBRARY),
-            PackageFile("guards.txt", FileRole.GUARDS),
-            PackageFile("oneos-telephony.jar", FileRole.INJECTION_JAR),
-            PackageFile("oneos-telephony.sha256", FileRole.INJECTION_SHA256),
-            PackageFile("OneOSPhoneInjection.apk", FileRole.RRO),
-            PackageFile("OneOSPixelStatusBar.apk", FileRole.RRO),
-            PackageFile(GUEST_APP, FileRole.GUEST_APP),
-        ) + (COMMON_PAYLOADS + listOf("cellbroadcast", "bt", "nfcservices", "telephonycore", "conscrypt", "profiling", "gmssystem"))
-            .map { PackageFile("${it}_payload.img", FileRole.APEX_PAYLOAD) },
+        files = PIXEL_FILES,
         omitted = listOf(TETHERING),
         approxBytes = 485_687_124L,
         hasReturnApp = true,
     )
 
-    val ALL: List<PackageSet> = listOf(N6_F8U, X9U_SULTRA, PIXEL_F8U)
+    /**
+     * Pixel 11 Pro image, Galaxy S26 Ultra (0.4.10), from out/overlays_pixel_kodiak:
+     * the Pixel set's files, built from that image (all the guards, the guest
+     * vold as gvld, the signal poll, the status bar padding RRO, GmsCore).
+     */
+    val PIXEL_SULTRA = PackageSet(
+        id = ID_PIXEL_SULTRA,
+        imageId = Images.ID_PIXEL_KODIAK,
+        sourceDir = "out/overlays_pixel_kodiak",
+        files = PIXEL_FILES,
+        omitted = listOf(TETHERING),
+        approxBytes = 485_702_461L,
+        hasReturnApp = true,
+    )
+
+    val ALL: List<PackageSet> = listOf(N6_F8U, X9U_SULTRA, X9U_IN_SULTRA, PIXEL_F8U, PIXEL_SULTRA)
 
     fun byId(id: String, sets: List<PackageSet> = ALL): PackageSet? = sets.firstOrNull { it.id == id }
 }

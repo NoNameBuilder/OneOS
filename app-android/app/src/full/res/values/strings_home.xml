@@ -36,6 +36,11 @@
     <string name="home_value_space_free">%1$s free</string>
     <string name="home_value_space_short">Free up %1$s</string>
     <string name="home_value_space_setup">%1$s free · setup needs %2$s</string>
+    <string name="home_value_space_old">%1$s free · %2$s</string>
+    <plurals name="home_space_old_copies">
+        <item quantity="one">%d old copy</item>
+        <item quantity="other">%d old copies</item>
+    </plurals>
     <string name="home_value_battery">%1$d%% · %2$d °C</string>
     <string name="home_value_battery_no_temp">%1$d%%</string>
     <string name="home_value_lock_off">Off</string>

@@ -37,6 +37,13 @@ object OldStages {
         OldStage(p[1], kib, image, p[4] == "1", p[5] == "1")
     }.sortedWith(compareBy<OldStage>({ it.isTrash }, { it.setAsideEpoch }, { it.name }))
 
+    /** The name the active stage got when `restore` set it aside (`@@RESULT restored <name> <aside>`), or null. */
+    fun setAsideBy(results: List<String>, name: String): String? =
+        results.firstNotNullOfOrNull { l ->
+            val p = l.split(' ')
+            if (p.size == 3 && p[0] == "restored" && p[1] == name && RootScript.OLD_STAGE_NAME.matches(p[2])) p[2] else null
+        }
+
     /** The KiB `purge` reports it freed (`@@RESULT purged <name> <KiB>`), or null. */
     fun freedKib(results: List<String>, name: String): Long? =
         results.firstNotNullOfOrNull { l ->

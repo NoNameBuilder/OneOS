@@ -41,7 +41,13 @@ class StageScriptTest {
     }
 
     /** Prepares a stage the way PrepareJob does, with small stand-ins for every file: [imageId] (default the profile's first) and its set. */
-    private class Stager(val fr: FakeRoot, val profile: PhoneProfile = Profiles.S_ULTRA_8850, val imageId: String = profile.choices.first().imageId) {
+    // The first image that is not the IN build (0.4.11 lists it first on the bar phones): these tests
+    // stage the CN build unless they ask for another.
+    private class Stager(
+        val fr: FakeRoot,
+        val profile: PhoneProfile = Profiles.S_ULTRA_8850,
+        val imageId: String = profile.choices.first { it.imageId != Images.ID_FIND_X9U_IN }.imageId,
+    ) {
         val set: PackageSet = PackageSets.byId(profile.choice(imageId)!!.packageSetId)!!
         val files: Map<String, ByteArray> = (RootScript.SCRIPTS + set.names).associateWith { n ->
             when (n) {
@@ -363,6 +369,87 @@ class StageScriptTest {
         assertFalse(trash.exists())
     }
 
+    /** 0.4.10: restore puts a set-aside stage back and keeps the one set up now as another old copy. */
+    @Test
+    fun restoreSwapsTheStageWithASetAsideCopy() = eachShell { fr ->
+        val s = Stager(fr)
+        s.prepare()
+        val markerBefore = File(fr.stage, ".oneos_stage").readText()
+        val old = oldStage(fr, "oneos.old-1792000000", image = Images.ID_PIXEL_YOGI)
+        File(old, "bin").mkdirs()
+        FakeRoot.exec(listOf("chmod", "755", old.path, File(old, "bin").path))
+        val oldMarker = File(old, ".oneos_stage").readText()
+        // A session earlier in this boot that returned does not stop it (purge would refuse it).
+        File(fr.stage, "return_keys").mkdirs()
+        File(fr.stage, "return_keys/boot").writeText("11111111-2222-3333-4444-555555555555\n")
+        val r = fr.run(RootScript.Verb.RESTORE, old.name)
+        ok(r)
+        val aside = OldStages.setAsideBy(r.reply.results, old.name)
+        assertTrue(r.toString(), aside != null && aside.startsWith("oneos.old-"))
+        assertEquals(oldMarker, File(fr.stage, ".oneos_stage").readText())
+        assertTrue(File(fr.stage, "data/system/packages.xml").isFile)
+        assertFalse(old.exists())
+        assertEquals(markerBefore, File(fr.root, "data/local/tmp/$aside/.oneos_stage").readText())
+        // And back the same way.
+        ok(fr.run(RootScript.Verb.RESTORE, aside!!))
+        assertEquals(markerBefore, File(fr.stage, ".oneos_stage").readText())
+    }
+
+    @Test
+    fun restoreRefusesEveryUnsafeCaseAndChangesNothing() = eachShell { fr ->
+        val s = Stager(fr)
+        s.prepare()
+        val old = oldStage(fr, "oneos.old-1792000000")
+        File(old, "bin").mkdirs()
+        FakeRoot.exec(listOf("chmod", "755", old.path, File(old, "bin").path))
+        var before = fr.snapshot()
+        fun restoreRefused(name: String, part: String) {
+            refused(fr.run(RootScript.Verb.RESTORE, name), part)
+            assertEquals(before, fr.snapshot())
+        }
+        // Mounted under the copy or under the stage.
+        fr.mountinfo(listOf("${old.path}/data"))
+        restoreRefused(old.name, "mounted")
+        fr.mountinfo(listOf("${fr.stage.path}/rootfs"))
+        restoreRefused(old.name, "mounted")
+        fr.mountinfo(emptyList())
+        // A loop device on a file in either.
+        File(fr.root, "sys/block/loop0/loop/backing_file").writeText("${fr.stage.path}/system.raw\n")
+        restoreRefused(old.name, "loop device")
+        File(fr.root, "sys/block/loop0/loop/backing_file").delete()
+        // A host /data tree still bridged.
+        fr.mountinfo(listOf("${fr.root.path}/data/app"))
+        restoreRefused(old.name, "still bridged")
+        fr.mountinfo(emptyList())
+        // A session that never returned, in the copy or in the stage; one running now.
+        File(old, "persist_session.active").writeText("format=2\nboot_id=99999999-0000-0000-0000-000000000000\n")
+        before = fr.snapshot()
+        restoreRefused(old.name, "never returned")
+        File(old, "persist_session.active").delete()
+        File(fr.stage, "guest_props.boot").writeText("11111111-2222-3333-4444-555555555555")
+        before = fr.snapshot()
+        restoreRefused(old.name, "session running")
+        File(fr.stage, "guest_props.boot").delete()
+        before = fr.snapshot()
+        // Not a set-aside copy: a stopped delete, a folder without a marker, a name that is not there.
+        val trash = File(fr.root, "data/local/tmp/oneos.trash-1792000200").apply { mkdirs() }
+        before = fr.snapshot()
+        assertTrue(RootScript.problems(RootScript.Verb.RESTORE, listOf(trash.name)).isNotEmpty())
+        File(old, "bin").delete()
+        before = fr.snapshot()
+        restoreRefused(old.name, "no bin folder")
+        File(old, "bin").mkdirs()
+        FakeRoot.exec(listOf("chmod", "775", File(old, "bin").path))
+        before = fr.snapshot()
+        restoreRefused(old.name, "writable by others")
+        FakeRoot.exec(listOf("chmod", "755", File(old, "bin").path))
+        File(old, ".oneos_stage").delete()
+        before = fr.snapshot()
+        restoreRefused(old.name, "no stage marker")
+        restoreRefused("oneos.old-1792000009", "no stage marker")
+        assertTrue(File(fr.stage, ".oneos_stage").isFile)
+    }
+
     @Test
     fun purgeTakesOnlyOldStageNames() {
         for (bad in listOf(
@@ -583,7 +670,9 @@ class StageScriptTest {
         val onlyN6 = PackageSets.N6_F8U.names - PackageSets.PIXEL_F8U.names.toSet()
         val onlyPixel = PackageSets.PIXEL_F8U.names - PackageSets.N6_F8U.names.toSet()
         assertTrue(onlyN6.containsAll(listOf("surfaceflinger_patched", "oplus-services_patched.jar", PackageSets.WALLPAPER_GRID_RRO)))
-        assertTrue(onlyPixel.containsAll(listOf("vold_patched", "service.incremental_patched.so", "oneos-telephony.jar", "oneos-telephony.sha256", PackageSets.GUEST_APP, PackageSets.GMS_PAYLOAD)))
+        assertTrue(onlyPixel.containsAll(listOf("oneos-telephony.jar", "oneos-telephony.sha256", "OneOSPixelStatusBar.apk", PackageSets.GMS_PAYLOAD)))
+        // Both sets carry the guest vold as gvld and the in-guest app since 0.4.8 (each its own vold build).
+        assertTrue(listOf("vold_patched", "service.incremental_patched.so", PackageSets.GUEST_APP).none { it in onlyN6 || it in onlyPixel })
         fun attic() = File(fr.stage, "attic").walkTopDown().filter { it.isFile }.map { it.name }.toSet()
 
         n6.prepare()
@@ -641,10 +730,110 @@ class StageScriptTest {
         fr.props["ro.product.device"] = "pa3q"
         fr.writeProps()
         refused(s.launch(), "codename pa3q, profile s-8750 is pa1q")
-        // Its pairs are exactly the S Ultra's: never the Fold's Find N6 or Pixel image, nor the IN build (0.3.3-0.3.6).
+        // Its pairs are exactly the S Ultra's: never the Fold's Find N6 or Pixel image; the IN build
+        // (0.3.3-0.3.6, again from 0.4.11) with its own set only.
         refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-8750", Images.ID_PIXEL_YOGI, PackageSets.ID_PIXEL_F8U, "4"), "does not run pixel11fold-yogi")
-        refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-8750", "coloros17-findx9u-in", "x9u-in-sultra", "4"), "does not run coloros17-findx9u-in")
+        refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-8750", Images.ID_FIND_X9U_IN, PackageSets.ID_X9U_SULTRA, "4"), "is not the file set of coloros17-findx9u-in")
+        assertEquals(PackageSets.X9U_IN_SULTRA, Stager(fr, Profiles.S_8750, Images.ID_FIND_X9U_IN).set)
         refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-8750", Images.ID_FIND_N6, PackageSets.ID_N6_F8U, "4"), "does not run coloros17-findn6")
+    }
+
+    /** 0.4.8: the Galaxy Z Fold7 (SM-F966, q7q, SM8750) takes the Find N6 image with the Fold's set, and only on itself. */
+    @Test
+    fun galaxyZFold7TakesTheFindN6Set() = eachShell { fr ->
+        fr.props["ro.product.model"] = "SM-F966B"
+        fr.props["ro.product.device"] = "q7q"
+        fr.props["ro.soc.model"] = "SM8750"
+        fr.writeProps()
+        val s = Stager(fr, Profiles.FOLD7)
+        assertEquals(PackageSets.N6_F8U, s.set)
+        s.prepare()
+        val m = StageMarker.parse(File(fr.stage, StageMarker.FILE_NAME).readText())!!
+        assertEquals(StageMarker(4, "f7", Images.ID_FIND_N6, PackageSets.ID_N6_F8U, m.createdEpoch), m)
+        assertEquals(SessionEnv.generate(Profiles.FOLD7), File(fr.stage, "session.env").readText())
+        refused(s.launch(), "test root: every launch check passed")
+        // The same stage on a Fold8 Ultra: refused.
+        fr.props["ro.product.model"] = "SM-F976B"
+        fr.writeProps()
+        refused(s.launch(), "is not a SM-F966")
+        // Never the Pixel image (it needs SVE) nor the S Ultras' Find X9 Ultra image.
+        refused(fr.run(RootScript.Verb.BEGIN, "keep", "f7", Images.ID_PIXEL_YOGI, PackageSets.ID_PIXEL_F8U, "4"), "does not run pixel11fold-yogi")
+        refused(fr.run(RootScript.Verb.BEGIN, "keep", "f7", Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, "4"), "does not run coloros17-findx9u")
+    }
+
+    /** 0.4.10: the Galaxy S25+ (SM-S936, pa2q, SM8750) takes the S25's Find X9 Ultra set, never a Pixel or Fold image. */
+    @Test
+    fun galaxyS25PlusTakesTheSUltraSet() = eachShell { fr ->
+        fr.props["ro.product.model"] = "SM-S936B"
+        fr.props["ro.product.device"] = "pa2q"
+        fr.props["ro.soc.model"] = "SM8750"
+        fr.writeProps()
+        val s = Stager(fr, Profiles.S_PLUS_8750)
+        assertEquals(PackageSets.X9U_SULTRA, s.set)
+        s.prepare()
+        val m = StageMarker.parse(File(fr.stage, StageMarker.FILE_NAME).readText())!!
+        assertEquals(StageMarker(4, "s-plus-8750", Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, m.createdEpoch), m)
+        refused(s.launch(), "test root: every launch check passed")
+        refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-plus-8750", Images.ID_PIXEL_KODIAK, PackageSets.ID_PIXEL_SULTRA, "4"), "does not run pixel11pro-kodiak")
+        refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-plus-8750", Images.ID_FIND_N6, PackageSets.ID_N6_F8U, "4"), "does not run coloros17-findn6")
+    }
+
+    /** 0.4.10: the Galaxy Z Fold8 (SM-F971, h8q, SM8850) takes the Fold's two images with their sets, and only on itself. */
+    @Test
+    fun galaxyZFold8TakesTheFoldSets() = eachShell { fr ->
+        fr.props["ro.product.model"] = "SM-F971B"
+        fr.props["ro.product.device"] = "h8q"
+        fr.props["ro.soc.model"] = "SM8850"
+        fr.writeProps()
+        val n6 = Stager(fr, Profiles.FOLD8)
+        assertEquals(PackageSets.N6_F8U, n6.set)
+        n6.prepare()
+        assertEquals("f8", StageMarker.parse(File(fr.stage, StageMarker.FILE_NAME).readText())!!.profileId)
+        refused(n6.launch(), "test root: every launch check passed")
+        val pixel = Stager(fr, Profiles.FOLD8, Images.ID_PIXEL_YOGI)
+        assertEquals(PackageSets.PIXEL_F8U, pixel.set)
+        // On a Fold8 Ultra: refused.
+        fr.props["ro.product.model"] = "SM-F976B"
+        fr.writeProps()
+        refused(n6.launch(), "is not a SM-F971")
+        refused(fr.run(RootScript.Verb.BEGIN, "keep", "f8", Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, "4"), "does not run coloros17-findx9u")
+    }
+
+    /**
+     * 0.4.11: the Galaxy S26 (SM-S942 and the Japanese SC-51G, m1q, SM8850)
+     * takes the S Ultra's two sets; the S24 Ultra (SM-S928, e3q, SM8650), S23
+     * (SM-S911, dm1q) and S23+ (SM-S916, dm2q, SM8550) take the X9U set only.
+     */
+    @Test
+    fun galaxyS26S24UltraAndS23sTakeTheSUltraSets() {
+        for ((p, model) in listOf(
+            Profiles.S_8850 to "SM-S942B",
+            Profiles.S_8850_JP to "SC-51G",
+            Profiles.S_ULTRA_8650 to "SM-S928B",
+            Profiles.S_8550 to "SM-S911B",
+            Profiles.S_PLUS_8550 to "SM-S916U",
+            Profiles.S_PLUS_8850 to "SM-S947U",
+        )) {
+            eachShell { fr ->
+                fr.props["ro.product.model"] = model
+                fr.props["ro.product.device"] = p.codename
+                fr.props["ro.soc.model"] = p.socModel
+                fr.writeProps()
+                val s = Stager(fr, p)
+                assertEquals(p.id, PackageSets.X9U_SULTRA, s.set)
+                assertEquals(p.id, PackageSets.X9U_IN_SULTRA, Stager(fr, p, Images.ID_FIND_X9U_IN).set)
+                if (p.socModel == "SM8850") {
+                    assertEquals(p.id, PackageSets.PIXEL_SULTRA, Stager(fr, p, Images.ID_PIXEL_KODIAK).set)
+                } else {
+                    refused(fr.run(RootScript.Verb.BEGIN, "keep", p.id, Images.ID_PIXEL_KODIAK, PackageSets.ID_PIXEL_SULTRA, "4"), "does not run pixel11pro-kodiak")
+                }
+                refused(fr.run(RootScript.Verb.BEGIN, "keep", p.id, Images.ID_FIND_N6, PackageSets.ID_N6_F8U, "4"), "does not run coloros17-findn6")
+                s.prepare()
+                val m = StageMarker.parse(File(fr.stage, StageMarker.FILE_NAME).readText())!!
+                assertEquals(StageMarker(4, p.id, Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, m.createdEpoch), m)
+                refused(s.launch(), "test root: every launch check passed")
+            }
+        }
     }
 
     /** The CN builds have no Google services: neither env nor launch may hide them, and a refused launch changes nothing. */
@@ -683,7 +872,7 @@ class StageScriptTest {
         refused(s.receive("surfaceflinger_patched", "x".toByteArray()), "not a file of pixel-f8u")
         val n6 = Stager(fr, Profiles.F8U)
         ok(n6.begin("keep"))
-        refused(n6.receive("vold_patched", "x".toByteArray()), "not a file of n6-f8u")
+        refused(n6.receive("OneOSPhoneInjection.apk", "x".toByteArray()), "not a file of n6-f8u")
         refused(n6.receive("oneos-telephony.sha256", "x".toByteArray()), "not a file of n6-f8u")
         // A plan that pairs the image with another set (not root's own doing) is not used.
         File(fr.stage, "incoming/plan").writeText("f8u pixel11fold-yogi n6-f8u 4 1\n")
@@ -878,12 +1067,11 @@ class StageScriptTest {
      */
     @Test
     fun aHideableImagesLaunchWritesItsGoogleServicesChoice() {
-        val shipped = Shipped.rootScriptText
-        assertTrue(shipped.contains("\nIMAGES_GMS=\"\"\n"))
-        val patched = shipped.replace("\nIMAGES_GMS=\"\"\n", "\nIMAGES_GMS=\"coloros17-findx9u\"\n").toByteArray()
-        eachShell(patched) { fr ->
-            val s = Stager(fr)
-            assertEquals(Images.ID_FIND_X9U, s.imageId)
+        // 0.4.11: the Find X9 Ultra IN build, the one image whose Google services a launch may hide.
+        assertTrue(Shipped.rootScriptText.contains("\nIMAGES_GMS=\"coloros17-findx9u-in\"\n"))
+        eachShell { fr ->
+            val s = Stager(fr, Profiles.S_ULTRA_8850, Images.ID_FIND_X9U_IN)
+            assertEquals(PackageSets.X9U_IN_SULTRA, s.set)
             s.prepare()
             val env = File(fr.stage, "session.env")
             assertTrue(env.readLines().contains("ONEOS_GUEST_HIDE_GMS=0"))

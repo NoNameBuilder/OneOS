@@ -82,6 +82,9 @@ object RootScript {
 
         /** Deletes one old stage after its checks (0.3.5). */
         PURGE("purge", Stdin.SCRIPT),
+
+        /** Uses a set-aside stage (`oneos.old-*`) again; the stage moves aside (0.4.10). */
+        RESTORE("restore", Stdin.SCRIPT),
     }
 
     /**
@@ -166,6 +169,12 @@ object RootScript {
                 need(1)
                 args.getOrNull(0)?.let { if (!OLD_STAGE_NAME.matches(it)) p += "purge: '${it.take(40)}' is not an old stage" }
             }
+            Verb.RESTORE -> {
+                need(1)
+                args.getOrNull(0)?.let {
+                    if (!OLD_STAGE_NAME.matches(it) || !it.startsWith("oneos.old-")) p += "restore: '${it.take(40)}' is not a set-aside stage"
+                }
+            }
         }
         return p
     }
@@ -238,7 +247,7 @@ case "$1" in
             exit 2
         fi
         ;;
-    old-list|purge)
+    old-list|purge|restore)
         if [ ! -f "$S/.oneos_stage" ] || [ ! -d "$S/bin" ] || ! mine "$S" || ! mine "$S/bin"; then
             echo "@@REFUSED OneOS has no prepared stage on this phone: prepare one first"
             exit 2

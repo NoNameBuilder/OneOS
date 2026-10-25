@@ -30,61 +30,96 @@ OUT=$(cd "$OUT" && pwd)
 # run 43 it took over "vold" and android.system.vold.IVold/default in the shared
 # servicemanager; One UI's vold kept running without its names and cannot be
 # restarted (init.rc: reboot_on_failure), so only a reboot gave One UI its
-# storage back (docs/inplace-return.md). Only the Pixel 17 (yogi) build pinned
-# below, by sha256; done before services.jar, whose patch
-# (patches/guest_own_vold.py) goes with it:
-# - vold 0xde12 "vold" -> "gvld": the String16 VoldNativeService::start()
-#   passes to addService (adrp 0x65100 + add 0x65104); the other 9 references
-#   are async_safe log tags in forked children. 4 bytes: "gvld" has no '/' or
-#   '.', so servicemanager wants no VINTF declaration for it.
-# - vold 0x64ac8 "tbz w19, #0, 0x64b9c" -> "b 0x64b9c": VendorVoldNativeService
-#   ::try_start always takes its "not declared" path (returns OK), so the guest
-#   never registers android.system.vold.IVold/default. Not renamed: a VINTF
-#   name servicemanager refuses unless the manifest declares it.
-# - service.incremental.so 0x64129 "vold" -> "gvld": both IncrementalService
-#   lookups (adr 0xc09ec, adrp 0xc32ec + add 0xc32f0, String16(s, 4)); the
+# storage back (docs/inplace-return.md). Only the builds pinned below, by
+# sha256; done before services.jar, whose patch (patches/guest_own_vold.py)
+# goes with it. Offsets are the Pixel 17 (yogi) build's, then ColorOS 17
+# CP2A.260605.016's (the Find N6 and Find X9 Ultra images carry the same vold
+# and service.incremental.so):
+# - vold 0xde12 / 0x104e7 "vold" -> "gvld": the String16
+#   VoldNativeService::start() passes to addService (adrp 0x65100 + add
+#   0x65104 / adrp 0x79174 + add 0x79178); the other 9 references are
+#   async_safe log tags in forked children. 4 bytes: "gvld" has no '/' or '.',
+#   so servicemanager wants no VINTF declaration for it.
+# - vold 0x64ac8 / 0x78b64 "tbz w19, #0, +0xd4" -> "b +0xd4":
+#   VendorVoldNativeService::try_start always takes its "not declared" path
+#   (returns OK), so the guest never registers android.system.vold.IVold/
+#   default. Not renamed: a VINTF name servicemanager refuses unless the
+#   manifest declares it.
+# - service.incremental.so 0x64129 / 0x6536c "vold" -> "gvld": both
+#   IncrementalService lookups (adr, and adrp + add with String16(s, 4)); the
 #   guest system_server loads it (run 43: incfs v2).
-# Segments: file offset == vaddr in both. The crashrecovery APEX is pinned too:
-# its RescueParty is the guest's one call left that reaches One UI's "vold"
+# Function addresses from each binary's .gnu_debugdata symbols; segments: file
+# offset == vaddr in all four files. The crashrecovery APEX is pinned too: its
+# RescueParty is the guest's one call left that reaches One UI's "vold"
 # (RecoverySystem.rebootPromptAndWipeUserData), and only while RescueParty is
-# on, which guest_start.sh checks. Other images (ColorOS) are not patched and
-# their guest vold keeps "vold" (no return without a reboot). "gvld" falls to
-# service_contexts' catch-all default_android_service, which only a permissive
-# session may add and find.
+# on (AOSP's isDisabled() in both builds), which guest_start.sh checks. On
+# ColorOS, OPPO's OplusStorageManagerFeature looks up "vold" too
+# (oplus-services.jar, guest_own_vold.py --oplus below). Other images are not
+# patched and their guest vold keeps "vold" (no return without a reboot).
+# "gvld" falls to service_contexts' catch-all default_android_service, which
+# only a permissive session may add and find.
 rm -f "$OUT/vold_patched" "$OUT/service.incremental_patched.so"
 "$DEBUGFS" -R "dump /system/bin/vold $WORK/vold" "$IMG" 2>/dev/null
 "$DEBUGFS" -R "dump /system/lib64/service.incremental.so $WORK/service.incremental.so" "$IMG" 2>/dev/null
-"$DEBUGFS" -R "dump /system/apex/com.google.android.crashrecovery.apex $WORK/crashrecovery.apex" "$IMG" 2>/dev/null
+"$DEBUGFS" -R "dump /system/apex/com.google.android.crashrecovery.apex $WORK/crashrecovery-google.apex" "$IMG" 2>/dev/null
+"$DEBUGFS" -R "dump /system/apex/com.android.crashrecovery.apex $WORK/crashrecovery-aosp.apex" "$IMG" 2>/dev/null
+"$DEBUGFS" -R "dump /system/apex/com.google.android.crashrecovery_compressed.apex $WORK/crashrecovery-google-compressed.apex" "$IMG" 2>/dev/null
 python3 -I - "$WORK" "$OUT/vold_patched" "$OUT/service.incremental_patched.so" <<'PYEOF'
 import hashlib, os, sys
 work, vold_out, inc_out = sys.argv[1:4]
-PINS = {
-    "vold": "5ecfb2f67a941129a382a150a865d01ad62898d534dafc102ac1fab832b335b7",
-    "service.incremental.so": "3add0c259ba1e76378359d556d792136f96ce75197c99ff9d3d7fe850d8e4a92",
-    "crashrecovery.apex": "fc82e88e3234efc0db0fff5da07e66005f6530e930671a42ac64788421793947",
-}
-data, other = {}, []
-for name, want in PINS.items():
+# The NULs either side: the whole string, not a suffix of a longer one.
+NAME = (b"\0vold\0", b"\0gvld\0")
+TRY_START = (bytes.fromhex("b3060036"), bytes.fromhex("35000014"))
+BUILDS = [
+    ("Pixel 17 (yogi)", {
+        "vold": "5ecfb2f67a941129a382a150a865d01ad62898d534dafc102ac1fab832b335b7",
+        "service.incremental.so": "3add0c259ba1e76378359d556d792136f96ce75197c99ff9d3d7fe850d8e4a92",
+        "crashrecovery-google.apex": "fc82e88e3234efc0db0fff5da07e66005f6530e930671a42ac64788421793947",
+    }, [("vold", 0xde11, NAME), ("vold", 0x64ac8, TRY_START), ("service.incremental.so", 0x64128, NAME)]),
+    # The Pixel 11 Pro (kodiak) image of the same build: the same vold and
+    # service.incremental.so, a crashrecovery APEX packaged differently whose
+    # service-crashrecovery.jar decompiles to the same smali as yogi's.
+    ("Pixel 17 (kodiak)", {
+        "vold": "5ecfb2f67a941129a382a150a865d01ad62898d534dafc102ac1fab832b335b7",
+        "service.incremental.so": "3add0c259ba1e76378359d556d792136f96ce75197c99ff9d3d7fe850d8e4a92",
+        "crashrecovery-google.apex": "8ae8917117e528bc876f8658633a65ed370b32ac1f8b77180909a94a5d1f87b9",
+    }, [("vold", 0xde11, NAME), ("vold", 0x64ac8, TRY_START), ("service.incremental.so", 0x64128, NAME)]),
+    ("ColorOS 17 CP2A.260605.016 (Find N6, Find X9 Ultra)", {
+        "vold": "3df4d13bb9636cb9833a6ee2027d189c6acfd25b0404058ca130afb164a55896",
+        "service.incremental.so": "43ae83091df41f9cd43fa985e7b629e09ba9f581d93336d0efb38dd05de1bab8",
+        "crashrecovery-aosp.apex": "a8396ec6bebe9511a701315964314aa8a755bef32d20cf4458293ed319bfdcf1",
+    }, [("vold", 0x104e6, NAME), ("vold", 0x78b64, TRY_START), ("service.incremental.so", 0x6536b, NAME)]),
+    # The Find X9 Ultra IN (global) build of the same release: its vold is
+    # the CN one laid out 0x2000 later (the same instructions; start() takes
+    # the string at 0x7b178, try_start's tbz is at +0x68 as in the CN build),
+    # service.incremental.so has the string and both lookups where the CN one
+    # has them, and its compressed crashrecovery APEX holds the same
+    # service-crashrecovery.jar as Pixel's yogi, byte for byte.
+    ("ColorOS 17 CP2A.260605.016 IN (Find X9 Ultra global)", {
+        "vold": "7fe53478f0e482e64a680bd12f6ead83f0501d62cab5d6de085bfeec8acecc5f",
+        "service.incremental.so": "25979ef93ee4b1a781c16adc783febdba2462563e5a7e69f4ba24d011d4b8427",
+        "crashrecovery-google-compressed.apex": "304784481c167b3d196c9ba8ce8d45ea7b59b04b2c061d0b19ed0a4e93574f50",
+    }, [("vold", 0x104e6, NAME), ("vold", 0x7ab64, TRY_START), ("service.incremental.so", 0x6536b, NAME)]),
+]
+def read(name):
     p = os.path.join(work, name)
-    data[name] = bytearray(open(p, "rb").read()) if os.path.isfile(p) else bytearray()
-    have = hashlib.sha256(data[name]).hexdigest()
-    if have != want:
-        other.append("%s %s" % (name, have[:12] if data[name] else "missing"))
-if other:
-    print("vold: not the Pixel 17 (yogi) build this was written against (%s): not patched, the guest vold keeps the name vold" % ", ".join(other))
+    return bytearray(open(p, "rb").read()) if os.path.isfile(p) else bytearray()
+def sha(d):
+    return hashlib.sha256(d).hexdigest()
+data = {n: read(n) for n in ("vold", "service.incremental.so", "crashrecovery-google.apex", "crashrecovery-aosp.apex", "crashrecovery-google-compressed.apex")}
+build = next((b for b in BUILDS if all(sha(data[n]) == want for n, want in b[1].items())), None)
+if build is None:
+    have = ", ".join("%s %s" % (n, sha(d)[:12] if d else "missing") for n, d in data.items())
+    print("vold: not a build this was written against (%s): not patched, the guest vold keeps the name vold" % have)
     sys.exit(0)
-def patch(name, off, old, new):
+for name, off, (old, new) in build[2]:
     d = data[name]
     if d[off:off + len(old)] != old:
         sys.exit("%s: unexpected bytes at %#x, not patching" % (name, off))
     d[off:off + len(old)] = new
-# The NULs either side: the whole string, not a suffix of a longer one.
-patch("vold", 0xde11, b"\0vold\0", b"\0gvld\0")
-patch("vold", 0x64ac8, bytes.fromhex("b3060036"), bytes.fromhex("35000014"))
-patch("service.incremental.so", 0x64128, b"\0vold\0", b"\0gvld\0")
 open(vold_out, "wb").write(data["vold"])
 open(inc_out, "wb").write(data["service.incremental.so"])
-print("built %s (registers gvld, not android.system.vold.IVold/default)" % vold_out)
+print("built %s for %s (registers gvld, not android.system.vold.IVold/default)" % (vold_out, build[0]))
 print("built %s (looks up gvld)" % inc_out)
 PYEOF
 VOLD_GVLD=0
@@ -182,6 +217,12 @@ if in_image /system/framework/oplus-services.jar; then
     DIRS=$(printf '%s\n' $DIRS $NEW | sort -u)
     NEW=$(python3 -I "$ROOT/switcher/patches/guest_no_sysrq_crash.py" "$WORK/oplus")
     DIRS=$(printf '%s\n' $DIRS $NEW | sort -u)
+    # With the guest vold as "gvld": OPPO's own "vold" lookup too
+    # (OplusStorageManagerFeature, patches/guest_own_vold.py --oplus).
+    if [ "$VOLD_GVLD" = 1 ]; then
+        NEW=$(python3 -I "$ROOT/switcher/patches/guest_own_vold.py" --oplus "$WORK/oplus")
+        DIRS=$(printf '%s\n' $DIRS $NEW | sort -u)
+    fi
     # OPPO's own IInstalld.Stub.asInterface() calls go through services.jar's
     # OneOSInstalldProxy too (patches/guest_installd_abi.py --callers).
     NEW=$(python3 -I "$ROOT/switcher/patches/guest_installd_abi.py" --callers "$WORK/oplus")
@@ -192,6 +233,9 @@ if in_image /system/framework/oplus-services.jar; then
 
     # OPPO's default runtime grants without CUST_LEVEL_LIST (patches/oplus_default_grants.py).
     NEW=$(python3 -I "$ROOT/switcher/patches/oplus_default_grants.py" "$WORK/oplus")
+    DIRS=$(printf '%s\n' $DIRS $NEW | sort -u)
+    # No charge error warnings from the missing OPPO charger HAL's -1 (patches/oplus_battery_notify.py).
+    NEW=$(python3 -I "$ROOT/switcher/patches/oplus_battery_notify.py" "$WORK/oplus")
     DIRS=$(printf '%s\n' $DIRS $NEW | sort -u)
     java -jar "$APKTOOL" b -q -o "$WORK/oplus-rebuilt.jar" "$WORK/oplus"
     cp "$WORK/oplus-services.jar" "$OUT/oplus-services_patched.jar"

@@ -37,6 +37,10 @@ host's kernel, vendor HALs, init and property area.
 
 | run 34: Weather never finds a location; OPPO system apps lack the runtime permissions ColorOS grants them | OplusRuntimePermGrantPolicyManager grants OPPO apps their default runtime permissions on every boot, but reads the lists (`<default-grant-permissions>` in my_product and my_stock `etc/permissions`) only through `OplusCfgFilePolicy.getCfgLevelList`, which is empty without `CUST_LEVEL_LIST` ("default xmls not found", 16:29:11.463). The network location provider com.oplus.location had no location or phone permission and WifiService refused all 27 of its scans ("UID 10163 has no location permission"); Weather asks the network provider first, then GPS, and timed out after 60 s (16:34:16-16:35:16); com.coloros.weather.service had no background location (`-410005`). 108 grants of 35 installed OPPO apps were missing | `oplus_default_grants.py`: with no CUST_LEVEL_LIST, `getDefaultPermissionFiles` reads `/my_product/etc/permissions` and `/my_stock/etc/permissions` while the guest's `/data/oneos_oplus_grants` exists (`master_prepare.sh`; `ONEOS_GUEST_OPLUS_GRANTS=0` leaves it out). OPPO's own checks stay: system apps or a matching certificate, requested permissions only, never over a user's choice. Run 35 to confirm |
 | run 34: GPS in the guest without A-GPS (no fix in four 57 s Weather sessions) | One UI's com.qualcomm.location holds the HAL's A-GPS callback (`vendor.qti.gnss` ILocAidlAGnss.setCallbackExt), which outranks Android's IAGnss callback in libgnss (`GnssAdapter::initAgpsCommand` callback priority). It died with One UI (16:28:34.332 "IAGnssCallback died") and the guest image has no com.qualcomm.location, so the HAL kept sending SUPL connection requests to the dead callback (16:34:19.116 `requestATL`, "locAidlAgnssStatusIpV4Cb: Peer has gone", 15 s later "LocSvc_Agps: Entered timeout event"). `OplusGnssPowerCorrector: isEngineOffByStrategy: true` is only logged when a request stops; the engine did start | `master_inner.sh` restarts the vendor `gnss_service` before the guest zygote, so the guest's own IAGnss callback is the only one (`ONEOS_GUEST_GNSS_RESTART=0` leaves the HAL alone). A fix still needs sky view; `diag_*/location.txt` (dumpsys location) shows providers, satellites and fixes. Run 35 to confirm |
+| 0.4.10 (Fold, USB to a PC): a charging "voltage error" warning whenever plugged in | OplusBatteryService takes the battery notify code from OPPO's ICharger HAL (`getPsyBatteryNotify`), which Samsung's vendor lacks: -1, broadcast as `notifycode`, and ColorOS's SystemUI (OplusPowerNotificationWarnings.updateBattery) tests it bit by bit, every bit set ("updateBattery : event code is -1 mPlugged is 2") | `oplus_battery_notify.py` stores a negative notify code as 0; a real code from a HAL that answers still gets through |
+| 0.4.10 (Fold): the cover screen "looks 720p", blurry even at High resolution | not resolution: SurfaceFlinger drew the cover 1:1 at 1080 x 2520 with full-size buffers. ColorOS took Samsung's shared `ro.sf.lcd_density` 480 for it, a 360 dp phone layout about 14% larger than One UI's 420 on the same 422 dpi panel | `oneos_switch.sh` records the cover (uniqueId, port, size, dpi) from One UI's display dump; `guest_prepare.sh` gives it `forcedDensity` in the guest's `display_settings.xml`: its real dpi down to a multiple of 20 (420, also one of ColorOS's own display sizes), only under the base density and never over a size chosen in ColorOS. The inner panel and `display_density_forced` stay as they were (`ONEOS_GUEST_COVER_DENSITY=off\|auto\|<dpi>`) |
+| S25 Ultra (X9U CN, 0.4.7, session e98f44ff): the status bar clock next to the camera, in the middle | One UI runs the 1440 px panel at FHD+ (1080), so the camera hole read from its display dump was 521..560; ColorOS runs the whole panel, where that is left of the middle (HOLE_LEFT_TYPE) and the clock starts right of it | `oneos_switch.sh` scales the hole by the cutout's `physicalDisplayWidth / displayWidth` (695..747 on 1440 px: a centre hole) |
+| S25 Ultra (same session): Bluetooth never turns on, com.android.bluetooth aborts 2.5 s after each start (19 times) | `[broadcaster.cc:1532] Initialize: HAL requirements not met`, after "HalVersionManager: No supported HAL version": the SM8750 and older phones register only Samsung's `vendor.samsung.hardware.bluetooth.audio.ISehBluetoothAudioProviderFactory`, not Android's `IBluetoothAudioProviderFactory/default` (probe reports: only the SM8850 phones have it), and the stack's HIDL fallback is off; One UI turns every LE Audio profile on, and the LE Audio broadcaster then aborts the process | `guest_props.sh` turns the LE Audio profiles off for the session (`bluetooth.profile.bap.*`, csip, hap, vcp, ccp, mcp; memory only, restored on return) when the phone has no `IBluetoothAudioProviderFactory/default`, so classic Bluetooth starts (`ONEOS_GUEST_LE_AUDIO=1` keeps them). Bluetooth audio there still needs a bridge to Samsung's provider. 0.4.11 asked with `service list`, which waits on every service's interface: One UI's surfaceflinger is frozen behind the gap splash then, so every 0.4.11 switch hung there (S24 Ultra session 0210fa8a: logo, black, reboot); 0.4.12 uses `service check` (servicemanager only) |
 
 ## Returning to One UI
 
@@ -58,6 +62,89 @@ with clean APEX reads after the setup), and once ended in an ext4
 `commit 27673bb` blames `apexd.config.compressed_apex=false` for the last row.
 That is wrong: the host defines that property itself, so the guest's value is
 never loaded. The prop blocklist it added is kept as a precaution only.
+
+## Pixel-era fixes and ColorOS (2026-10-25)
+
+The ColorOS sets the app ships (`n6-f8u`, `x9u-sultra`) were built on
+2026-10-23 with the storage, installd, power, sysrq and weaver guards only.
+What the Pixel work since then means for them:
+
+- **Comes with a rebuild of the sets, no new code**: the biometric,
+  gatekeeper, FRP (pdb), apexd, app-id-15000 and no-new-users guards. Each
+  patcher reads ColorOS's non-R8 smali as well as Pixel's, and make-overlays
+  applies them to any image. The in-guest OneOS app (Back to One UI, its
+  Quick Settings tile) also comes with the rebuild: guest_prepare.sh copies
+  it into every guest's /oem.
+- **Guest vold as "gvld"**, so Back to One UI can return without a restart
+  (`docs/inplace-return.md`). The Find N6 and Find X9 Ultra images carry the
+  same `vold` and `service.incremental.so` (CP2A.260605.016), and both have
+  the layout of Pixel's: `VoldNativeService::start` at 0x79140 passes the
+  only "\0vold\0" (0x104e7) to addService, and `VendorVoldNativeService::
+  try_start` at 0x78afc has the same `tbz w19, #0, +0xd4` after isDeclared
+  (0x78b64). `service.incremental.so` has its one "vold" at 0x6536c, with
+  the same two lookups. services.jar has the same three lookups as Pixel's.
+  OPPO adds a fourth in oplus-services.jar
+  (`OplusStorageManagerFeature.connectVold`, OPPO's own IVold calls), which
+  `guest_own_vold.py --oplus` moves to "gvld" too, and guest_start.sh checks
+  for it. The crashrecovery APEX (`com.android.crashrecovery`, the same in
+  both images) has AOSP's RescueParty: the factory reset that calls
+  `rebootPromptAndWipeUserData` runs only while RescueParty is on. No other
+  native library in system_server names "vold"; the binaries that do
+  (gsid, incident_helper, apexd, vdc, vold) are the same as Pixel's, and the
+  guest runs none but its vold. make-overlays.sh pins all three files.
+- **eSIM guard**: the Find X9 Ultra image's EuiccOplus is hidden like
+  Pixel's EuiccGoogle; the Find N6 image has no eSIM manager.
+- **Already shared** (same session scripts for every image): host-state
+  record, stage-mount cleanup and Permissive return, hardened reboots, the
+  in-place sequence (gated on gvld, so ColorOS returns by reboot until its
+  sets carry it), session sampler and logcat capture.
+- **Pixel-only today, worth a ColorOS test**: Bluetooth music. Samsung's
+  audio HAL turns its A2DP offload path on only from `l_a2dp_format`
+  (run 44), whatever the guest is, and guest_start.sh sends it only to
+  non-ColorOS guests. No ColorOS Bluetooth audio test is on record; if
+  music plays on the speaker, sending it there is the first thing to try.
+  HFP's `bluetooth.sco.managed_by_audio` does not apply: the Find N6 image
+  does not set it.
+- **Not needed for ColorOS**: the attach APN (ColorOS attaches with the
+  right APN itself), signal poll injection and call audio (ColorOS has its
+  own), the Wi-Fi supplicant switch, density and fold line, Comfort View,
+  the status bar padding RRO and Google Play services packaging.
+
+A rebuilt set changes what runs in a ColorOS session (new guards, gvld, the
+in-place return), so it needs a ColorOS session on the Fold, and on an S
+Ultra for the X9U set, before friends get it.
+
+## The Find X9 Ultra IN build (0.4.11)
+
+The global (India) build of the Find X9 Ultra's ColorOS 17
+(`OneOS_ColorOS17_FindX9Ultra_IN.img.gz`, the 0.3.3 upload byte for byte),
+offered on every Galaxy S profile next to the CN build and listed first. It
+brings Google's mainline modules, Play services and the Play Store in
+my_product. Differences from the CN build that the session and the set handle:
+
+- **Its own gvld pins** (`make-overlays.sh`): its vold is the CN one laid out
+  0x2000 later (same instructions; the try_start branch at 0x7ab64), its
+  service.incremental.so has the string and both lookups where the CN one
+  does, and its crashrecovery module is a compressed APEX
+  (`com.google.android.crashrecovery_compressed.apex`) whose
+  service-crashrecovery.jar is Pixel yogi's, byte for byte. So it returns in
+  place like the CN build.
+- **Its set** (`x9u-in-sultra`): the CN set's files built from this image,
+  plus `cellbroadcast_payload.img` (Google's module, compressed in the image).
+  Only the in-guest app is byte-identical to the CN set's.
+- **Region overlays** (run 37): its 24 `my_product/cust/<region>/overlay`
+  folders are hidden for the session, or the zygote's fd allowlist aborts
+  system_server.
+- **No `region_CN`**: guest_prepare.sh adds the CN Wi-Fi feature only when
+  `my_region` says `ro.oplus.pipeline.region=CN`; this build keeps its
+  export Wi-Fi settings.
+- **Google services**: in the image and running by default; a launch may hide
+  them (`IMAGES_GMS`, `ONEOS_GUEST_HIDE_GMS=1`). The guards that keep the
+  guest out of One UI's lock and keys (weaver, gatekeeper, FRP) apply as with
+  Pixel.
+- **CPU**: its core binaries (linker, libc, app_process, boot image,
+  SurfaceFlinger, input) use no more SVE/SME than the CN build's, which runs
+  on the SM8750 phones.
 
 ## Where the boot stands (end of day 1, attempts 13-23)
 

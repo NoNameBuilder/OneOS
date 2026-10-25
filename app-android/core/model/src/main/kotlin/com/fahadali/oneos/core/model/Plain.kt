@@ -74,11 +74,14 @@ data class PlainFacts(
 object Plain {
     /** "Z Fold (F8U), Galaxy S26 Ultra, Galaxy S25 Ultra and Galaxy S25". */
     fun phoneList(profiles: List<PhoneProfile> = Profiles.BUILT_IN): String {
-        val names = profiles.filter { it.enabled }.map { it.label }
+        // A regional variant ("Galaxy S26 (docomo)") is listed under its phone's name, and
+        // "Galaxy" is said once: "Galaxy Z Fold (F8U), S26 Ultra and S25".
+        val all = profiles.filter { it.enabled }.map { it.label.removePrefix("Galaxy ") }
+        val names = all.filter { l -> all.none { l.startsWith("$it (") } }
         return when (names.size) {
             0 -> "phones listed in About"
-            1 -> names.single()
-            else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
+            1 -> "Galaxy " + names.single()
+            else -> "Galaxy " + names.dropLast(1).joinToString(", ") + " and " + names.last()
         }
     }
 
@@ -241,6 +244,12 @@ object Plain {
                 "Not tested on this phone yet",
                 "This phone's software is older than on the phones where $system has run.",
                 FixAction.NONE,
+            )
+            Profiles.ID_NOTE_EXPECT_NO_START -> m(
+                "Most likely won't start on this phone",
+                "Its software is too old. If the screen stays black, One UI comes back by itself. Then share the " +
+                    "session logs from Advanced.",
+                FixAction.ACKNOWLEDGE,
             )
             SwitchGates.ID_LOGS -> m(
                 "Last session's logs aren't read yet",

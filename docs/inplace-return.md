@@ -120,11 +120,14 @@ started (running)", "One UI's system_server N", "user 0 unlocked after Ns",
 
 ## The guest vold as "gvld"
 
-`scripts/make-overlays.sh` patches the Pixel 17 (yogi) build only. It checks
-three files by sha256, and checks the old bytes before writing anything. Any
-other image (the ColorOS ones) is not patched: the build logs "not
-the Pixel 17 (yogi) build this was written against" and the guest vold keeps
-`vold`, which means no return without a reboot.
+`scripts/make-overlays.sh` patches two builds: Pixel 17 (yogi), and since
+2026-10-25 ColorOS 17 CP2A.260605.016, whose vold and service.incremental.so
+the Find N6 and Find X9 Ultra images share. It checks three files of each by
+sha256, and checks the old bytes before writing anything. Any other image is
+not patched: the build logs "not a build this was written against" and the
+guest vold keeps `vold`, which means no return without a reboot.
+
+Pixel 17 (yogi):
 
 | File (sha256 prefix) | Offset | Old | New | Effect |
 |---|---|---|---|---|
@@ -133,7 +136,21 @@ the Pixel 17 (yogi) build this was written against" and the guest vold keeps
 | `/system/lib64/service.incremental.so` (`3add0c25`) | 0x64129 | `vold` | `gvld` | Both IncrementalService lookups (adr 0xc09ec; adrp 0xc32ec + add 0xc32f0, `String16(s, 4)`) |
 | `/system/apex/com.google.android.crashrecovery.apex` (`fc82e88e`) | | | pinned, not changed | Its RescueParty is the guest's one call left that reaches One UI's `vold` (see below) |
 
-- In both binaries the file offset equals the vaddr in every LOAD segment.
+ColorOS 17 CP2A.260605.016 (same changes, found from each binary's
+`.gnu_debugdata` symbols with the NDK's llvm-objdump):
+
+| File (sha256 prefix) | Offset | Old | New | Effect |
+|---|---|---|---|---|
+| `/system/bin/vold` (`3df4d13b`) | 0x104e7 | `vold` | `gvld` | `VoldNativeService::start()` (0x79140) registers `gvld` (adrp 0x79174 + add 0x79178); 9 log tags besides |
+| same | 0x78b64 | `b3 06 00 36` (`tbz w19, #0, 0x78c38`) | `35 00 00 14` (`b 0x78c38`) | `VendorVoldNativeService::try_start` (0x78afc), as on Pixel |
+| `/system/lib64/service.incremental.so` (`43ae8309`) | 0x6536c | `vold` | `gvld` | Both IncrementalService lookups (adr 0xc005c; adrp 0xc2710 + add 0xc2714, `String16(s, 4)`) |
+| `/system/apex/com.android.crashrecovery.apex` (`a8396ec6`) | | | pinned, not changed | AOSP's RescueParty, as on Pixel |
+
+On ColorOS, oplus-services.jar has a fourth lookup,
+`OplusStorageManagerFeature.connectVold` (OPPO's own IVold calls), which
+`guest_own_vold.py --oplus` moves to `gvld` too.
+
+- In all four binaries the file offset equals the vaddr in every LOAD segment.
 - No relocation and no data pointer refers to either string.
 - The vendor name is skipped, not renamed: it is a VINTF name, and
   servicemanager refuses any such name the manifest does not declare.
@@ -166,8 +183,8 @@ left. make-overlays.sh runs this patch only when it built `vold_patched`.
   `/system/lib64/service.incremental.so`, checks that both binds are in place,
   and writes `gvld` to the guest's `/data/oneos_vold_name`.
 
-A set without the two files (ColorOS) binds neither, and leaves no
-`oneos_vold_name`.
+A set without the two files (the ColorOS sets built before 2026-10-25) binds
+neither, and leaves no `oneos_vold_name`.
 
 ## Guest code that reached "vold"
 

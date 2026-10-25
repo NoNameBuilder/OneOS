@@ -23,10 +23,15 @@ the vendor name, and a service.incremental.so that looks up "gvld"
    runs only while RescueParty is on; guest_start.sh refuses a gvld guest
    unless persist.sys.disable_rescue is true (oneos_switch.sh [1/6]).
 
-make-overlays.sh runs this only when it built vold_patched; other images
-(ColorOS) keep "vold".
+3. With --oplus, the same for ColorOS's oplus-services.jar: its one "vold"
+   lookup, OplusStorageManagerFeature.connectVold (OPPO's own IVold calls:
+   DFS fuse, tmp storage, SD lock), becomes "gvld". Left as it was, those
+   calls would reach One UI's vold, whose transaction codes are not OPPO's.
 
-Usage: guest_own_vold.py <smali root dir>
+make-overlays.sh runs this only when it built vold_patched (Pixel 17 and
+ColorOS 17 CP2A.260605.016); other images keep "vold".
+
+Usage: guest_own_vold.py [--oplus] <smali root dir>
 Prints the smali_* directories (dex files) it changed, one per line.
 """
 import os
@@ -41,10 +46,13 @@ WANT = {
     ("com/android/server/StorageManagerService$StorageManagerInternalImpl", "prepareStorageDirs"),
     ("com/android/server/stats/pull/StatsPullAtomService", "getIVoldService"),
 }
+WANT_OPLUS = {
+    ("com/android/server/storage/OplusStorageManagerFeature", "connectVold"),
+}
 WIPE = "Landroid/os/RecoverySystem;->rebootPromptAndWipeUserData("
 
 
-def main(root):
+def main(root, want, jar):
     # Written only once every file has passed (a failed run leaves the tree as it was).
     pending, sites = {}, set()
     for dirpath, _, files in os.walk(root):
@@ -90,15 +98,18 @@ def main(root):
                 print(f'{cls}.{method}: {lk.group(2)}("vold") -> "gvld"', file=sys.stderr)
             if dirty:
                 pending[path] = "\n".join(lines)
-    if sites != WANT:
-        sys.exit(f'expected the "vold" lookups {sorted(WANT)}, found {sorted(sites)}')
+    if sites != want:
+        sys.exit(f'expected the "vold" lookups {sorted(want)}, found {sorted(sites)}')
     for path, text in pending.items():
         with open(path, "w") as f:
             f.write(text)
-    print("services.jar: no RecoverySystem.rebootPromptAndWipeUserData call left", file=sys.stderr)
+    print(f"{jar}: no RecoverySystem.rebootPromptAndWipeUserData call left", file=sys.stderr)
     for d in sorted({os.path.relpath(path, root).split(os.sep)[0] for path in pending}):
         print(d)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    if sys.argv[1:2] == ["--oplus"]:
+        main(sys.argv[2], WANT_OPLUS, "oplus-services.jar")
+    else:
+        main(sys.argv[1], WANT, "services.jar")

@@ -176,7 +176,8 @@ class SessionEnvTest {
             }
             assertTrue(SessionEnv.validate(text.replace("${SessionEnv.HIDE_GMS}=0\n", ""), image = hideable).contains("${SessionEnv.HIDE_GMS} missing"))
         }
-        assertEquals(emptyList<ImageRef>(), Images.ALL.filter { it.gmsHideable })
+        // 0.4.11: the Find X9 Ultra IN build's Google services (in the image, not presented) may be hidden.
+        assertEquals(listOf(Images.FIND_X9U_IN), Images.ALL.filter { it.gmsHideable })
         assertEquals("ONEOS_GUEST_HIDE_GMS", SessionEnv.ALLOWED.keys.toList().dropLast(1).last())
     }
 

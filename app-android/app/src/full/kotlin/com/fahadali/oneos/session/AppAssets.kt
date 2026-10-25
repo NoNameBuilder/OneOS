@@ -34,12 +34,18 @@ object AppAssets {
         return b
     }
 
-    private fun pinned(set: String): String = when (set) {
-        PackageSets.ID_N6_F8U -> BuildConfig.SET_N6_F8U_SHA256
-        PackageSets.ID_X9U_SULTRA -> BuildConfig.SET_X9U_SULTRA_SHA256
-        PackageSets.ID_PIXEL_F8U -> BuildConfig.SET_PIXEL_F8U_SHA256
-        "scripts" -> BuildConfig.SCRIPTS_SHA256
-        else -> throw Broken("no pin for $set")
+    /**
+     * The pin app/build.gradle.kts writes for every packed set, as
+     * BuildConfig.SET_<ID>_SHA256 (0.4.12: looked up by name; the hand-written
+     * list missed pixel-sultra and x9u-in-sultra, and their setups stopped at
+     * "no pin for <set>").
+     */
+    private fun pinned(set: String): String {
+        if (set == "scripts") return BuildConfig.SCRIPTS_SHA256
+        if (PackageSets.byId(set) == null) throw Broken("no pin for $set")
+        val field = "SET_${set.uppercase(java.util.Locale.ROOT).replace('-', '_')}_SHA256"
+        return runCatching { BuildConfig::class.java.getField(field).get(null) as String }.getOrNull()
+            ?: throw Broken("no pin for $set")
     }
 
     private fun list(ctx: Context, id: String): Map<String, String> {

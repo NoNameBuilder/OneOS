@@ -313,7 +313,11 @@ object SwitchGates {
         val system = Images.systemName(image, profile, images)
         out += Gate(CarrierRules.finding(input.carrier, system), if (switching) CarrierRules.ackText(input.carrier, system) else null)
         if (image != null) out += Gate(CpuRules.forImage(image, f.cpu))
-        if (profile != null) out += profile.notes.map { Gate(it) }
+        if (profile != null) {
+            out += profile.notes.map { n ->
+                Gate(n, if (switching && n.id == Profiles.ID_NOTE_EXPECT_NO_START) Profiles.expectNoStartAck(system) else null)
+            }
+        }
         if (switching && input.uncollectedLogs) {
             out += Gate(
                 Finding(

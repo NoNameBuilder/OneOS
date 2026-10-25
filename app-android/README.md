@@ -140,8 +140,9 @@ root for the read-only tests (the same probe path as Run tests in OneOS).
   or S Ultra, or when it matches an explicit profile
   (`CompatEvaluator.inScope`). Before, the S25's report was BLOCK
   `model-out-of-scope` (family Galaxy S); now it is an untested WARN. Any
-  other S-series model (S25+, S24, an S25 with another codename or chip)
-  stays BLOCK `model-out-of-scope`, and the BLOCK names the S25 profile's ids.
+  other S-series model (S22, S24, an S25 with another codename or chip)
+  stays BLOCK `model-out-of-scope`, and the BLOCK names the profiled S-series
+  phones' ids (0.4.10-0.4.11 added the S25+, S26, S24 Ultra, S23 and S23+).
 - **Root**: `profile_info` has `s-8750 → SM-S931 pa1q SM8750 bar`,
   `profile_set` its two (image, set) pairs. `StageAuditTest` checks the tables
   against the model, `StageScriptTest` prepares and launch-checks an S25

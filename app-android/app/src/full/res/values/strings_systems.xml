@@ -77,6 +77,13 @@
     <string name="setup_done_button">Done</string>
     <string name="setup_failed_title">Setup didn\'t finish</string>
     <string name="setup_close">Close</string>
+    <string name="setup_delete_old">Delete the old copy</string>
+    <string name="setup_delete_old_title">Delete the old copy?</string>
+    <string name="setup_delete_old_message">The system you had set up before was kept as an old copy with its apps, accounts and settings (%1$s). Delete it to free its space? You can\'t undo it. One UI and the new system aren\'t touched.</string>
+    <string name="setup_old_size_unknown">size not read yet</string>
+    <string name="setup_old_deleting">Deleting the old copy…</string>
+    <string name="setup_old_deleted">Old copy deleted · %1$s freed</string>
+    <string name="setup_old_not_deleted">Old copy not deleted: see Free up space</string>
     <string name="setup_idle_title">Nothing is being set up</string>
     <string name="setup_idle_subtitle">Choose a system on the main screen to set one up.</string>
 

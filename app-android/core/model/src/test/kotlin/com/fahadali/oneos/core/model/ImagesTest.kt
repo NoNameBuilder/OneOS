@@ -9,6 +9,16 @@ class ImagesTest {
     private val x9u = Images.FIND_X9U
     private val n6 = Images.FIND_N6
     private val pixel = Images.PIXEL_YOGI
+    private val xin = Images.FIND_X9U_IN
+
+    /** A sample of an image an earlier build took (none is retired in 0.4.11). */
+    private val old = RetiredImage(
+        id = "coloros16-findx8u",
+        shortName = "Find X8 Ultra",
+        gzName = "OneOS_ColorOS16_FindX8Ultra.img.gz",
+        gzBytes = 4_000_000_001L,
+        rawBytes = 9_000_000_000L,
+    )
 
     @Test
     fun builtInTable() {
@@ -44,23 +54,32 @@ class ImagesTest {
         // Its loader is built for SVE2 (the disassembly of its linker64); SME and MOPS have fallbacks.
         assertEquals(listOf("sve", "sve2"), pixel.cpuRequired)
         assertEquals(emptyList<String>(), pixel.cpuUsedByApps)
-        // Only the Pixel image has Google services, and its sessions present them: no image may hide them (0.3.7).
-        assertEquals(listOf(pixel), Images.ALL.filter { it.googleServices })
-        assertEquals(listOf(pixel), Images.ALL.filter { it.presentsGms })
-        assertEquals(emptyList<ImageRef>(), Images.ALL.filter { it.gmsHideable })
+        // The Pixel images have Google services and their sessions present them; the
+        // Find X9 Ultra IN build has them in the image and a launch may hide them.
+        assertEquals(listOf(xin, pixel, Images.PIXEL_KODIAK), Images.ALL.filter { it.googleServices })
+        assertEquals(listOf(pixel, Images.PIXEL_KODIAK), Images.ALL.filter { it.presentsGms })
+        assertEquals(listOf(xin), Images.ALL.filter { it.gmsHideable })
         assertTrue(pixel.copy(presentsGms = false).gmsHideable)
-        assertEquals(listOf(n6, x9u, pixel), Images.ALL)
-        // The Find X9 Ultra IN build is gone (0.3.7): no image by its id or sizes.
-        assertNull(Images.byId("coloros17-findx9u-in"))
-        assertNull(Images.byGzSize(5_882_128_321L))
-        assertNull(Images.byRawSize(12_069_945_344L))
-        // Its name stays known for old stages, the last session and a remembered download.
-        assertEquals("Find X9 Ultra IN", Images.shortName("coloros17-findx9u-in"))
+        assertEquals(listOf(n6, x9u, xin, pixel, Images.PIXEL_KODIAK), Images.ALL)
+        // 0.4.11: the Find X9 Ultra IN build is back (0.3.3-0.3.6, dropped in 0.3.7), the same file.
+        assertEquals("coloros17-findx9u-in", xin.id)
+        assertEquals("OneOS_ColorOS17_FindX9Ultra_IN.img.gz", xin.gzName)
+        assertEquals(5_882_128_321L, xin.gzBytes)
+        assertEquals("413380426cdff8b5e760f1424895fc5b43e7a6ffe5f889e0406e437590c0d04e", xin.gzSha256)
+        assertEquals(12_069_945_344L, xin.rawBytes)
+        assertEquals("a36ef550f4b2530fb9c7c6d363180d9eb4437e0497ebc87292697e4bf2a580b0", xin.rawSha256)
+        assertEquals(x9u.buildId, xin.buildId)
+        assertEquals(null, xin.testedOn)
+        assertEquals(xin, Images.byGzSize(5_882_128_321L))
+        assertEquals(xin, Images.byRawSize(12_069_945_344L))
+        assertEquals("Find X9 Ultra IN", Images.shortName(xin.id))
+        // Nothing is retired now; a retired image's name stays known (old stages, the last session).
+        assertEquals(emptyList<RetiredImage>(), Images.RETIRED)
+        assertEquals("Find X8 Ultra", Images.shortName(old.id, retired = listOf(old)))
         assertEquals("Find N6", Images.shortName(n6.id))
         assertEquals("not-an-image", Images.shortName("not-an-image"))
-        assertTrue(Images.RETIRED.none { r -> Images.byId(r.id) != null || Images.byGzSize(r.gzBytes) != null || Images.byRawSize(r.rawBytes) != null })
         // Guest data stays with its own system (0.3.7): the ColorOS builds and the Pixel image.
-        assertEquals(listOf(SystemFamily.COLOROS, SystemFamily.COLOROS, SystemFamily.PIXEL), Images.ALL.map { it.family })
+        assertEquals(listOf(SystemFamily.COLOROS, SystemFamily.COLOROS, SystemFamily.COLOROS, SystemFamily.PIXEL, SystemFamily.PIXEL), Images.ALL.map { it.family })
         for (i in Images.ALL) assertEquals(i.id, i.id.startsWith("coloros17-"), i.family == SystemFamily.COLOROS)
 
         for (i in Images.ALL) {
@@ -121,7 +140,8 @@ class ImagesTest {
         assertEquals(Level.BLOCK, n6OnS26.finding.level)
         // The BLOCK names every image the phone takes.
         assertEquals(
-            "This is the Find N6 image; Galaxy S26 Ultra takes the Find X9 Ultra image (OneOS_ColorOS17_FindX9Ultra_S26U.img.gz).",
+            "This is the Find N6 image; Galaxy S26 Ultra takes the Find X9 Ultra IN image (OneOS_ColorOS17_FindX9Ultra_IN.img.gz) " +
+                "or the Find X9 Ultra image (OneOS_ColorOS17_FindX9Ultra_S26U.img.gz) or the Pixel 11 Pro image (OneOS_Pixel11Pro_Full_S26U.img.gz).",
             n6OnS26.finding.detail,
         )
         // The Pixel image is the Fold's only (0.3.7): refused on an S Ultra and the Galaxy S25, by size alone already.
@@ -130,9 +150,13 @@ class ImagesTest {
                 val pixelOnBar = ImageIdentifier.identify(check, p)
                 assertEquals(p.id, ImageState.WRONG_FOR_PHONE, pixelOnBar.state)
                 assertEquals(pixel, pixelOnBar.image)
-                assertTrue(pixelOnBar.finding.detail.startsWith("This is the Pixel 11 Fold image; ${p.label} takes the Find X9 Ultra image"))
+                assertTrue(pixelOnBar.finding.detail, pixelOnBar.finding.detail.startsWith("This is the Pixel 11 Fold image; ${p.label} takes the Find X9 Ultra IN image"))
             }
         }
+        // The Galaxy Z Fold7 takes the Find N6 image only: Pixel's system code needs SVE, which SM8750 lacks.
+        val pixelOnFold7 = ImageIdentifier.identify(ImageFileCheck(null, pixel.gzBytes, pixel.gzSha256, pixel.gzBytes), Profiles.FOLD7)
+        assertEquals(ImageState.WRONG_FOR_PHONE, pixelOnFold7.state)
+        assertEquals("This is the Pixel 11 Fold image; Galaxy Z Fold7 takes the Find N6 image (OneOS_ColorOS17_FindN6_ZFold8.img.gz).", pixelOnFold7.finding.detail)
         // The owner does not want the X9U (CN) image on his Fold; by size alone already.
         for (check in listOf(ImageFileCheck(null, x9u.gzBytes, x9u.gzSha256, x9u.gzBytes), ImageFileCheck(null, x9u.gzBytes))) {
             val x9uOnFold = ImageIdentifier.identify(check, Profiles.F8U)
@@ -157,9 +181,16 @@ class ImagesTest {
         fun verified(i: ImageRef, p: PhoneProfile) = ImageIdentifier.identify(ImageFileCheck(i.gzName, i.gzBytes, i.gzSha256, i.gzBytes), p)
         val takes = mapOf(
             Profiles.F8U to listOf(n6, pixel),
-            Profiles.S_ULTRA_8850 to listOf(x9u),
-            Profiles.S_ULTRA_8750 to listOf(x9u),
-            Profiles.S_8750 to listOf(x9u),
+            Profiles.S_ULTRA_8850 to listOf(xin, x9u, Images.PIXEL_KODIAK),
+            Profiles.S_ULTRA_8750 to listOf(xin, x9u),
+            Profiles.S_8750 to listOf(xin, x9u),
+            Profiles.FOLD7 to listOf(n6),
+            Profiles.S_PLUS_8750 to listOf(xin, x9u),
+            Profiles.FOLD8 to listOf(n6, pixel),
+            Profiles.S_8850 to listOf(xin, x9u, Images.PIXEL_KODIAK),
+            Profiles.S_ULTRA_8650 to listOf(xin, x9u),
+            Profiles.S_8550 to listOf(xin, x9u),
+            Profiles.S_PLUS_8850 to listOf(xin, x9u, Images.PIXEL_KODIAK),
         )
         for ((p, good) in takes) {
             assertEquals(p.id, good, p.images())
@@ -191,7 +222,11 @@ class ImagesTest {
                 "(OneOS_Pixel11Fold_Full_ZFold8.img.gz)",
             ImageIdentifier.accepts(Profiles.F8U),
         )
-        assertEquals("Galaxy S26 Ultra takes the Find X9 Ultra image (OneOS_ColorOS17_FindX9Ultra_S26U.img.gz)", ImageIdentifier.accepts(Profiles.S_ULTRA_8850))
+        assertEquals(
+            "Galaxy S26 Ultra takes the Find X9 Ultra IN image (OneOS_ColorOS17_FindX9Ultra_IN.img.gz) or the Find X9 Ultra image " +
+                "(OneOS_ColorOS17_FindX9Ultra_S26U.img.gz) or the Pixel 11 Pro image (OneOS_Pixel11Pro_Full_S26U.img.gz)",
+            ImageIdentifier.accepts(Profiles.S_ULTRA_8850),
+        )
     }
 
     /** Two images of one size (not the case today): the SHA-256 decides, and a match the phone does not take is refused. */
@@ -233,7 +268,7 @@ class ImagesTest {
         assertTrue(cnOnFold.finding.detail.contains("Find X9 Ultra image; Z Fold (F8U) takes the Find N6 image"))
         val n6OnS26 = staged(n6.rawBytes, n6.rawSha256, Profiles.S_ULTRA_8850)
         assertEquals(ImageState.WRONG_FOR_PHONE, n6OnS26.state)
-        assertTrue(n6OnS26.finding.detail.contains("Galaxy S26 Ultra takes the Find X9 Ultra image (OneOS_ColorOS17_FindX9Ultra_S26U.img.gz)"))
+        assertTrue(n6OnS26.finding.detail, n6OnS26.finding.detail.contains("Galaxy S26 Ultra takes the Find X9 Ultra IN image (OneOS_ColorOS17_FindX9Ultra_IN.img.gz) or the Find X9 Ultra image (OneOS_ColorOS17_FindX9Ultra_S26U.img.gz)"))
         val pixelOnS26 = staged(pixel.rawBytes, pixel.rawSha256, Profiles.S_ULTRA_8850)
         assertEquals(ImageState.WRONG_FOR_PHONE, pixelOnS26.state)
         assertEquals(pixel, pixelOnS26.image)
@@ -254,15 +289,15 @@ class ImagesTest {
         assertEquals(Level.BLOCK, other.finding.level)
         assertTrue(other.finding.detail.contains("OneOS_ColorOS17_FindX9Ultra_S26U.img.gz"))
 
-        // A remembered .gz of the Find X9 Ultra IN build (0.3.6 and earlier): named, and not called "not a OneOS image".
-        val inGz = id(ImageFileCheck("OneOS_ColorOS17_FindX9Ultra_IN.img.gz", 5_882_128_321L))
-        assertEquals(ImageState.UNKNOWN, inGz.state)
-        assertEquals(ImageIdentifier.R_RETIRED, inGz.finding.reason)
-        assertEquals("Image no longer supported", inGz.finding.title)
-        assertTrue(inGz.finding.detail, inGz.finding.detail.contains("Find X9 Ultra IN") && inGz.finding.detail.contains(x9u.gzName))
-        val inRaw = ImageIdentifier.identifyStaged(StagedRaw(12_069_945_344L), Profiles.S_ULTRA_8850)
-        assertEquals(ImageIdentifier.R_RAW_NOT_OURS, inRaw.finding.reason)
-        assertTrue(inRaw.finding.detail, inRaw.finding.detail.contains("Find X9 Ultra IN"))
+        // A remembered .gz of a retired image: named, and not called "not a OneOS image".
+        val oldGz = ImageIdentifier.identify(ImageFileCheck(old.gzName, old.gzBytes), Profiles.S_ULTRA_8850, retiredImages = listOf(old))
+        assertEquals(ImageState.UNKNOWN, oldGz.state)
+        assertEquals(ImageIdentifier.R_RETIRED, oldGz.finding.reason)
+        assertEquals("Image no longer supported", oldGz.finding.title)
+        assertTrue(oldGz.finding.detail, oldGz.finding.detail.contains("Find X8 Ultra") && oldGz.finding.detail.contains(xin.gzName))
+        val oldRaw = ImageIdentifier.identifyStaged(StagedRaw(old.rawBytes), Profiles.S_ULTRA_8850, retiredImages = listOf(old))
+        assertEquals(ImageIdentifier.R_RAW_NOT_OURS, oldRaw.finding.reason)
+        assertTrue(oldRaw.finding.detail, oldRaw.finding.detail.contains("Find X8 Ultra"))
 
         val sizeless = id(ImageFileCheck(null, null))
         assertEquals(ImageState.UNKNOWN, sizeless.state)
@@ -294,10 +329,11 @@ class ImagesTest {
         assertEquals("Pixel 11 Fold (Android 17)", pixel.displayName)
         assertEquals("Pixel 11 Fold", Images.systemName(pixel, Profiles.F8U))
         // {system}: the name, with the variant only when the phone takes another of that name
-        // (0.3.7: no phone does; the Fold takes ColorOS 17 and Pixel 11 Fold).
+        // (the Fold takes ColorOS 17 and Pixel 11 Fold; from 0.4.11 the bar phones take two ColorOS 17 builds).
         assertEquals("ColorOS 17", Images.systemName(n6))
         assertEquals("ColorOS 17", Images.systemName(n6, Profiles.F8U))
-        assertEquals("ColorOS 17", Images.systemName(x9u, Profiles.S_ULTRA_8850))
+        assertEquals("ColorOS 17 · Find X9 Ultra build", Images.systemName(x9u, Profiles.S_ULTRA_8850))
+        assertEquals("ColorOS 17 · global build", Images.systemName(xin, Profiles.S_ULTRA_8850))
         val twin = Profiles.F8U.copy(choices = Profiles.F8U.choices + ImageChoice(x9u.id, PackageSets.ID_X9U_SULTRA, false))
         assertEquals("ColorOS 17 · Find N6 build", Images.systemName(n6, twin))
         assertEquals("the other system", Images.systemName(null))
@@ -315,10 +351,10 @@ class ImagesTest {
             ImageFileCheck("x", x9u.gzBytes),
             ImageFileCheck("x", n6.gzBytes),
             ImageFileCheck("x", n6.gzBytes, "0".repeat(64), n6.gzBytes),
-            ImageFileCheck("x", Images.RETIRED.first().gzBytes),
+            ImageFileCheck("x", old.gzBytes),
         )
         for (c in checks) {
-            val f = ImageIdentifier.identify(c, Profiles.F8U).finding
+            val f = ImageIdentifier.identify(c, Profiles.F8U, retiredImages = listOf(old)).finding
             if (f.level == Level.BLOCK) assertTrue("$c", f.reason != null)
         }
         for (raw in listOf(StagedRaw(null), StagedRaw(1), StagedRaw(x9u.rawBytes), StagedRaw(n6.rawBytes, "0".repeat(64)))) {

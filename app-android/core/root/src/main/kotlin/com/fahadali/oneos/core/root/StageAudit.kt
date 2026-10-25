@@ -407,7 +407,7 @@ object ShellScan {
  * phone's user data, reboots, settings, package wipes or mounts.
  */
 object StageAudit {
-    val VERBS = listOf("begin", "receive", "keep-raw", "table", "env", "finish", "launch", "recover", "old-list", "purge")
+    val VERBS = listOf("begin", "receive", "keep-raw", "table", "env", "finish", "launch", "recover", "old-list", "purge", "restore")
 
     val ALLOWED: Set<String> = setOf(
         "umask", "[", "echo", "printf", "id", "stat", "awk", "sed", "grep", "sort", "head", "tail", "cut", "tr", "wc",
@@ -449,6 +449,14 @@ object StageAudit {
     private const val PURGE_RM = "rm -rf \"\$TRASH\""
 
     /**
+     * `restore` (do_restore only, 0.4.10): `$RFROM` is `$OLD_PARENT/$1` after
+     * old_name_ok, renamed to `$STAGE` once the stage is renamed to its `$OLD`
+     * sibling (the documented exception above); no other write there.
+     */
+    private const val RESTORE_FUNCTION = "do_restore"
+    private val RESTORE_VARS = setOf("RFROM")
+
+    /**
      * The renames from the names up to 0.3.6 (migrate_legacy only), and no
      * other write there: `mv "$LEGACY" "$STAGE"`, `$LEGACY` being exactly
      * `$T/data/local/tmp/lineage_stage`, and `mv "$MFROM" "$MTO"`, `$MFROM`
@@ -469,6 +477,7 @@ object StageAudit {
         val a = arg.removePrefix("\"")
         val v = Regex("""^\$\{?([A-Za-z_][A-Za-z0-9_]*|1)""").find(a)?.groupValues?.get(1) ?: return false
         if (v in PURGE_VARS) return function == PURGE_FUNCTION
+        if (v in RESTORE_VARS) return function == RESTORE_FUNCTION
         if (v in MIGRATE_VARS) return function == MIGRATE_FUNCTION
         return v in STAGE_VARS || v in EXCEPTION_VARS || v in loopVars || (v == "1" && function in WRITE_HELPERS)
     }
@@ -508,6 +517,7 @@ object StageAudit {
                 "OLD" -> if (!v.startsWith("\$STAGE.old-") && !self) p += "line ${a.line}: OLD=${a.value}"
                 "OLD_PARENT" -> if (a.value != "\"\$DATA/local/tmp\"") p += "line ${a.line}: OLD_PARENT=${a.value}"
                 "OLDDIR" -> if (a.value != "\"\$OLD_PARENT/\$1\"" || a.function != PURGE_FUNCTION) p += "line ${a.line}: OLDDIR=${a.value}"
+                "RFROM" -> if (a.value != "\"\$OLD_PARENT/\$1\"" || a.function != RESTORE_FUNCTION) p += "line ${a.line}: RFROM=${a.value}"
                 "TRASH" -> if (a.function != PURGE_FUNCTION ||
                     !(v.startsWith("\$OLD_PARENT/oneos.trash-") || a.value == "\"\$OLDDIR\"" || self)
                 ) p += "line ${a.line}: TRASH=${a.value}"

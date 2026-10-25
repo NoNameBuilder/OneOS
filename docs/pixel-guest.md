@@ -335,13 +335,69 @@ staged) or `0`. Refused (switch preflight, or guest_prepare.sh) together with
 appid15000 guards, and on a stage whose packages.list has app uids
 10000-14999 (made before the app id guard: `deploy-phone.sh --fresh`).
 
-Not covered yet: signing in (not tried; the guest still uses the phone's
-gatekeeper, FRP partition and keystore2, with writes to the first two refused
-and keystore isolation now by guest app ids from 15000 plus no guest users or
-profiles); Play's module updates (refused by the apexd guard); dexopt of
-GmsCore (artd resolves paths in One UI's namespace, so it probably runs
-JIT-only). The OneOS app (0.3.7) stages the payload with the rest of its
-`pixel-f8u` set and never offers to hide Google services for this image.
+Not covered yet: signing in (reviewed, not tried on a phone: see below);
+Play's module updates (refused by the apexd guard); dexopt of GmsCore (artd
+resolves paths in One UI's namespace, so it probably runs JIT-only). The
+OneOS app (0.3.7) stages the payload with the rest of its `pixel-f8u` set and
+never offers to hide Google services for this image.
+
+### Signing in to Google (review, 2026-10-25)
+
+What a Google account adds to a guest that already runs Google Play services,
+and where each part lands. The Fold's stage (app 0.4.7) was checked read-only
+first: guards.txt lists the gatekeeper, pdb, apexd, appid15000 and nousers
+guards, packages.list has no app uid below 15000, and the stage holds no
+Google account yet.
+
+- **FRP.** Google Play services sets a factory-reset-protection secret
+  (`setFactoryResetProtectionSecret`; run 43 already shows three calls
+  without an account). The guest's PersistentDataBlockService writes its
+  `frp_secret` files into the stage and the partition write is discarded
+  (`guest_pdb_readonly.py`). One UI's partition holds the default secret, so
+  the guest still boots with FRP deactivated ("FRP secret matched" with the
+  default secret). The switch compares the partition's hash before and after
+  every session (host_state.log: unchanged so far).
+- **Screen lock.** Signing in sets no lock. Passkeys, Wallet and "verify it's
+  you" prompts that want one fail (`setLockCredential` returns false, the
+  gatekeeper guard): skip them.
+- **Keystore.** Google Play services makes its keys under its own app id
+  (15000 and up) in One UI's keystore2 database. One UI's apps are all below
+  15000, so neither side can reach the other's keys. The guest's keys stay in
+  One UI's database after the return, and deleting the stage does not remove
+  them (`clearNamespace` is dropped): harmless, but they are not cleaned up.
+- **Account storage.** `accounts_ce.db` is in the stage's
+  `data/system_ce/0`, a plain stage folder rather than credential-encrypted
+  storage, so root on One UI can read the account's tokens. Deleting the
+  stage removes the account from the phone; remove the device in the Google
+  account's device list too.
+- **Find My Device** lists the guest as another device (Pixel 11 Fold). A
+  remote erase reaches `wipeData` in the guest: the FRP wipe returns, the
+  recovery command (BCB) cannot be written and the guest cannot reboot the
+  phone, so One UI's data is not touched. The eSIM erase that comes with it
+  is what the eSIM guard below is for. Turning Find My Device off in the
+  guest is still the safer setting.
+- **eSIM.** The guest's eSIM manager (EuiccGoogle) talks to the phone's eSIM
+  chip directly. A guest factory reset with "Erase eSIMs", Erase downloaded
+  SIMs, Erase SIM or a remote erase would delete One UI's eSIM profiles, and
+  the test Fold's SIM 2 is an eSIM. guest_prepare.sh now hides the eSIM manager
+  apps (`safety.esim_guard`: EuiccGoogle and EuiccSupportPixel-P23 here); the
+  enabled eSIM keeps working, the guest just cannot change profiles.
+  `ONEOS_GUEST_ESIM_MANAGER=1` keeps them (adb sessions only).
+- **Play Store.** App updates install into the stage (`/data/app` is
+  bridged). Google Play system updates (APEX trains) are refused by the apexd
+  guard and Play will keep offering them.
+- **RCS.** Google Messages in the guest takes RCS over for both numbers. Back
+  in One UI its messaging app has to register again, and RCS messages sent in
+  between can wait for the guest. Leave RCS chats off in the guest unless
+  they are meant to live there.
+- **Google's side.** A "new sign-in on a Pixel 11 Fold" security alert. Play
+  Integrity's device check fails (unlocked bootloader, Samsung attestation),
+  as it does on rooted One UI.
+
+Verdict: safe to sign in with the current guards, if the guest gets no screen
+lock and no factory reset. Until the eSIM guard is on the phone (the next
+app build), also do not erase SIMs in the guest and turn Find My Device off
+after signing in.
 
 ## Bluetooth (run 43)
 

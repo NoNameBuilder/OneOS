@@ -99,9 +99,10 @@ for f in oneos_switch.sh guest_prepare.sh guest_start.sh guest_props.sh return_t
 done
 # The guarded jars: services_patched.jar, and oplus-services_patched.jar for a
 # ColorOS image (guards.txt lists what make-overlays.sh built; guest_prepare.sh
-# refuses an image with oplus-services.jar that lacks it). A Pixel set's
-# vold_patched and service.incremental_patched.so go with its services.jar
-# (the guest vold as "gvld", run 44), so they are checked the same way.
+# refuses an image with oplus-services.jar that lacks it). A set's
+# vold_patched and service.incremental_patched.so (Pixel 17, and ColorOS 17
+# since 0.4.8) go with its guarded jars (the guest vold as "gvld", run 44), so
+# they are checked the same way.
 GUARD_JARS="services_patched.jar $(awk '$2 == "oplus-services_patched.jar" || $2 == "vold_patched" || $2 == "service.incremental_patched.so" { print $2 }' "$STAGE/guards.txt")"
 
 if [ "$APP" = 1 ]; then
@@ -318,13 +319,53 @@ echo "Host state recorded: $(wc -l < "$STAGE/host_state.before") entries"
 # OplusStatusBarUtils.isHoleType, so the status icons ended next to the camera
 # with the right half of the bar empty. The top bounding rect of the one
 # default-capable internal display (S25: 511,0:569,103), or nothing.
+# The rect is in the size One UI runs the panel at, which the guest does not:
+# the S25 Ultra at One UI's FHD+ (1080 of its 1440 px) gave 521,0:560,72, and
+# ColorOS, on the whole 1440 px panel, took that for a hole left of the
+# middle (HOLE_LEFT_TYPE, session e98f44ff): the clock started right of it,
+# next to the real camera. Scaled to the panel's physical width
+# (cutoutPathParserInfo physicalDisplayWidth / displayWidth).
 rm -f "$STAGE/host_screenhole"
-HOLE=$(dumpsys display 2>/dev/null | grep 'DisplayDeviceInfo{' | grep 'type INTERNAL' | grep 'FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY' |
+HLINE=$(dumpsys display 2>/dev/null | grep 'DisplayDeviceInfo{' | grep 'type INTERNAL' | grep 'FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY')
+HOLE=$(printf '%s\n' "$HLINE" |
     sed -n 's/.*boundingRect={Bounds=\[Rect(-\{0,1\}[0-9]*, -\{0,1\}[0-9]* - -\{0,1\}[0-9]*, -\{0,1\}[0-9]*), Rect(\([0-9]*\), \([0-9]*\) - \([0-9]*\), \([0-9]*\)).*/\1,\2:\3,\4/p')
+HDW=$(printf '%s\n' "$HLINE" | sed -n 's/.*CutoutPathParserInfo{displayWidth=\([0-9]*\) displayHeight=[0-9]* physicalDisplayWidth=\([0-9]*\) .*/\1/p')
+HPW=$(printf '%s\n' "$HLINE" | sed -n 's/.*CutoutPathParserInfo{displayWidth=\([0-9]*\) displayHeight=[0-9]* physicalDisplayWidth=\([0-9]*\) .*/\2/p')
 if [ -n "$HOLE" ] && [ "$HOLE" = "${HOLE%%[!0-9,:]*}" ]; then
+    case "$HDW:$HPW" in
+        *[!0-9:]*|:*|*:) ;;
+        *) if [ "$HDW" -gt 0 ] && [ "$HPW" != "$HDW" ]; then
+               UIHOLE=$HOLE
+               HOLE=$(echo "$HOLE" | awk -F'[,:]' -v p="$HPW" -v d="$HDW" '{ printf "%d,%d:%d,%d", $1 * p / d + 0.5, $2 * p / d + 0.5, $3 * p / d + 0.5, $4 * p / d + 0.5 }')
+               echo "Host camera hole: One UI's $UIHOLE at $HDW px, $HOLE on the $HPW px panel"
+           fi ;;
+    esac
     echo "$HOLE" > "$STAGE/host_screenhole" && echo "Host camera hole: $HOLE"
 else
     echo "Host camera hole: not read ($(printf '%s\n' "$HOLE" | grep -c .) internal displays with a top cutout)"
+fi
+# The cover panel of a fold, for guest_prepare.sh (ColorOS cover density): the
+# smaller of the two default-capable internal displays, as
+# "<uniqueId> <port> <width> <height> <xdpi>". The guest's SurfaceFlinger
+# gives the panels the same ids (local:<id>) and ports as One UI's.
+rm -f "$STAGE/host_cover_display"
+if [ "${ONEOS_GUEST_FORM:-fold}" = fold ]; then
+    # One record per panel (a dump may list a panel more than once).
+    CVDS=$(printf '%s\n' "$HLINE" | while IFS= read -r l; do
+        u=$(echo "$l" | sed -n 's/.*uniqueId="\(local:[0-9]*\)", \([0-9]*\) x \([0-9]*\), .*/\1 \2 \3/p')
+        p=$(echo "$l" | sed -n 's/.*address [A-Za-z]*{[^}]*port=\([0-9]*\)[,}].*/\1/p')
+        x=$(echo "$l" | sed -n 's/.*, density [0-9]*, \([0-9]*\)[.0-9]* x [.0-9]* dpi.*/\1/p')
+        set -- $u
+        [ -n "$3" ] && [ -n "$p" ] && [ -n "$x" ] && echo "$(($2 * $3)) $1 $p $2 $3 $x"
+    done | sort -u)
+    CVD=""
+    [ "$(printf '%s\n' "$CVDS" | awk 'NF { print $2 }' | sort -u | wc -l)" = 2 ] &&
+        CVD=$(printf '%s\n' "$CVDS" | sort -n | head -n 1 | cut -d' ' -f2-)
+    if [ "$(echo "$CVD" | wc -w)" = 5 ]; then
+        echo "$CVD" > "$STAGE/host_cover_display" && echo "Host cover display: $CVD"
+    else
+        echo "Host cover display: not read"
+    fi
 fi
 
 # What a return without a reboot compares against (return_to_oneui.sh): One
@@ -1678,6 +1719,10 @@ if [ "$RETURN_MAX" -gt 0 ]; then
                         # Location as the guest sees it (run 34: Weather found none): providers
                         # and the package each is bound to, GNSS satellites, fixes and TTFF.
                         timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys location > \$D/location.txt 2>&1
+                        # Sensors and cameras as the guest sees them (Galaxy S25, X9U, session
+                        # 55af6cc8: compass and camera did not work, and nothing in the logs told why).
+                        timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys sensorservice > \$D/sensors.txt 2>&1
+                        timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys media.camera > \$D/camera.txt 2>&1
                         # Is the Wallpapers fold-grid overlay (guest_prepare.sh) enabled?
                         timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/cmd overlay list com.oplus.wallpapers > \$D/overlays_wallpapers.txt 2>&1
                         for e in /sys/class/input/event*; do

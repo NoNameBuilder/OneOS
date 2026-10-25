@@ -383,6 +383,11 @@ class StatusHomeFragment : Fragment(R.layout.home_content) {
                         if (level == Level.OK) level = Level.WARN
                         ctx.getString(R.string.home_value_space_setup, Units.bytes(free), Units.bytes(setupNeed))
                     }
+                    // 0.4.11: the old copies setup kept, which the tile then opens (Free up space).
+                    oldCopies() > 0 -> ctx.getString(
+                        R.string.home_value_space_old, Units.bytes(free),
+                        ctx.resources.getQuantityString(R.plurals.home_space_old_copies, oldCopies(), oldCopies()),
+                    )
                     else -> ctx.getString(R.string.home_value_space_free, Units.bytes(free))
                 }
             }
@@ -439,6 +444,7 @@ class StatusHomeFragment : Fragment(R.layout.home_content) {
         }
         for ((t, v) in tiles.zip(views)) {
             val action = t.plain?.action?.takeIf { it != FixAction.NONE && it != FixAction.ACKNOWLEDGE }
+                ?: FixAction.FREE_UP_SPACE.takeIf { t.check.id == SwitchGates.ID_SPACE && oldCopies() > 0 }
             val finding = t.finding
             if (s.cached != null || (action == null && finding == null)) continue
             v.foreground = selectableBackground(v.context)
@@ -448,6 +454,9 @@ class StatusHomeFragment : Fragment(R.layout.home_content) {
             }
         }
     }
+
+    /** Old copies the stage check saw (stage.old: kept copies and unfinished deletes). */
+    private fun oldCopies(): Int = StageCheck.state.result?.status?.oldStages?.size ?: 0
 
     // The whole tile when pressed (SESL's selectableItemBackground is a small centred circle).
     private fun selectableBackground(ctx: Context) = ctx.getDrawable(R.drawable.oneos_tile_ripple)

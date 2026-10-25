@@ -10,18 +10,21 @@ import org.junit.Test
 class GatesTest {
     private fun stage(
         p: PhoneProfile,
-        image: String = p.choices.first().imageId,
+        image: String = usual(p).imageId,
         verified: Boolean = true,
         set: String? = p.choice(image)?.packageSetId,
     ) = StageState(emptyList(), emptyList(), false, StageMarker(4, p.id, image, set, 1_792_000_000), verified)
 
     private fun gz(i: ImageRef) = ImageFileCheck(i.gzName, i.gzBytes, i.gzSha256, i.gzBytes)
 
-    /** Everything right for [phone] with [image] (screen lock removed, old switcher gone); default: the profile's first image. */
+    /** The image these tests stage by default: the profile's first that is not the IN build (listed first on the bar phones from 0.4.11). */
+    private fun usual(p: PhoneProfile) = p.choices.first { it.imageId != Images.ID_FIND_X9U_IN }
+
+    /** Everything right for [phone] with [image] (screen lock removed, old switcher gone); default: [usual]. */
     private fun input(
         phone: Bundles.Phone,
         profile: PhoneProfile? = Profiles.resolve(phone.facts).profile,
-        image: ImageRef? = profile?.let { Images.byId(it.choices.first().imageId) },
+        image: ImageRef? = profile?.let { Images.byId(usual(it).imageId) },
     ) = GateInput(
         facts = phone.facts,
         screenLockSet = false,
@@ -45,10 +48,10 @@ class GatesTest {
         assertFalse(r.blocked)
         // The Find X9 Ultra build is tested on it since 0.4.7: only the carrier tick.
         assertEquals(listOf(SwitchGates.ID_CARRIER), r.toTick.map { it.id })
-        // The ticks name the system: "ColorOS 17", the S Ultra's only ColorOS 17 build since 0.3.7 (with the
-        // IN build it was "ColorOS 17 · Find X9 Ultra build").
+        // The ticks name the system: with the IN build next to it (0.3.3-0.3.6, again from 0.4.11) the CN
+        // build is "ColorOS 17 · Find X9 Ultra build" (0.3.7-0.4.10, its only ColorOS 17 build: "ColorOS 17").
         val system = Images.systemName(Images.FIND_X9U, Profiles.S_ULTRA_8850)
-        assertEquals("ColorOS 17", system)
+        assertEquals("ColorOS 17 · Find X9 Ultra build", system)
         assertEquals(CarrierRules.noCallsAck(system), r.find(SwitchGates.ID_CARRIER)!!.ack)
         assertEquals("I understand phone calls, including emergency calls, won't work in $system", r.find(SwitchGates.ID_CARRIER)!!.ack)
         assertNull(r.find(SwitchGates.ID_PROFILE)!!.ack)
@@ -179,9 +182,10 @@ class GatesTest {
         val exynos = profileGate(Fixtures.facts(model = "SM-S948B", device = "m3s", soc = SocProps(manufacturer = "Samsung", model = "s5e9955")))
         assertEquals(Level.BLOCK, exynos.level(SwitchGates.ID_PROFILE))
         assertNull(exynos.profile)
-        val s24 = profileGate(Fixtures.facts(model = "SM-S928B", device = "e3q", soc = SocProps(manufacturer = "QTI", model = "SM8650")))
-        assertEquals(Level.BLOCK, s24.level(SwitchGates.ID_PROFILE))
-        assertTrue(s24.find(SwitchGates.ID_PROFILE)!!.finding.detail.contains("Galaxy S26 Ultra (SM-S948* / m3q / SM8850)"))
+        // Galaxy S23 Ultra: no profile (the S24 Ultra has one since 0.4.11).
+        val s23u = profileGate(Fixtures.facts(model = "SM-S918B", device = "dm3q", soc = SocProps(manufacturer = "QTI", model = "SM8550")))
+        assertEquals(Level.BLOCK, s23u.level(SwitchGates.ID_PROFILE))
+        assertTrue(s23u.find(SwitchGates.ID_PROFILE)!!.finding.detail.contains("Galaxy S26 Ultra (SM-S948* / m3q / SM8850)"))
         val wrongCodename = profileGate(Fixtures.s26Ultra().copy(device = "pa3q"))
         assertEquals(Level.BLOCK, wrongCodename.level(SwitchGates.ID_PROFILE))
         assertTrue(wrongCodename.find(SwitchGates.ID_PROFILE)!!.finding.detail.contains("codename pa3q (profile: m3q)"))
@@ -422,7 +426,9 @@ class GatesTest {
     @Test
     fun sUltraTakesTheX9UltraBuild() {
         for ((phone, p) in listOf(Bundles.S26U to Profiles.S_ULTRA_8850, Bundles.S25U to Profiles.S_ULTRA_8750, Bundles.S25 to Profiles.S_8750)) {
-            assertEquals(listOf(Images.FIND_X9U), p.images())
+            // 0.4.10: the S26 Ultra also takes the Pixel 11 Pro image (SM8850 has SVE); 0.4.11: the IN build first.
+            val usual = listOf(Images.FIND_X9U_IN, Images.FIND_X9U)
+            assertEquals(if (p == Profiles.S_ULTRA_8850) usual + Images.PIXEL_KODIAK else usual, p.images())
             for ((image, set) in listOf(Images.FIND_X9U to PackageSets.X9U_SULTRA)) {
                 for (phase in GatePhase.entries) {
                     val r = eval(phase, input(phone, image = image))

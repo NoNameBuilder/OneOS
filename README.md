@@ -47,6 +47,16 @@ App version 0.4.7. Snapdragon Samsung flagships only; root is required
 | ColorOS 17, Find N6 build | Galaxy Z Fold8 Ultra (SM-F976B), One UI 9 |
 | ColorOS 17, Find X9 Ultra CN build | Galaxy S25 (SM-S931), Galaxy S25 Ultra (SM-S938), Galaxy S26 Ultra (SM-S948) |
 
+Untested profiles, where the app asks you to tick that you know before
+switching: Galaxy Z Fold8 (SM-F971) and Z Fold7 (SM-F966), Galaxy S26+ (SM-S947),
+S26 (SM-S942, SC-51G), S25+ (SM-S936) and S24 Ultra (SM-S928) with ColorOS; the
+Pixel 11 Fold image on the Z Fold8, and the Pixel 11 Pro image on the Galaxy S26
+Ultra, S26+ and S26; and on every Galaxy S phone above, the Find X9 Ultra IN (global) build
+of ColorOS 17, with Google Play and the Play Store. Galaxy S23 (SM-S911) and
+S23+ (SM-S916) are accepted for testing only:
+their vendor software is too old and the system will most likely not start
+(One UI comes back by itself; please share the session logs).
+
 Pixel 11 Fold on the Galaxy Z Fold8 Ultra: calls and SMS on both SIMs, 5G and
 Wi-Fi, Bluetooth audio, Google Play and Google's apps, the inner and cover
 screens, blur, and Back to One UI (usually without a restart).

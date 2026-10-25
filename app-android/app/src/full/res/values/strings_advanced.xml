@@ -81,6 +81,29 @@
     <string name="space_delete_what">this old copy</string>
     <string name="space_delete_message">This deletes %1$s with its apps, accounts and settings (%2$s). You can\'t undo it. One UI and the system set up now aren\'t touched.</string>
     <string name="space_delete_run">Delete</string>
+    <string name="space_delete_all">Delete all old copies</string>
+    <string name="space_delete_all_summary">Frees %1$s</string>
+    <string name="space_delete_all_title">Delete all old copies?</string>
+    <string name="space_delete_all_message">This deletes %1$s with their apps, accounts and settings (%2$s). You can\'t undo it. One UI and the system set up now aren\'t touched.</string>
+    <plurals name="space_delete_all_count">
+        <item quantity="one">%d old copy</item>
+        <item quantity="other">%d old copies</item>
+    </plurals>
+    <string name="space_deleting_n">Deleting %1$d of %2$d…</string>
+    <plurals name="space_deleted_n">
+        <item quantity="one">Deleted %1$d old copy · %2$s freed</item>
+        <item quantity="other">Deleted %1$d old copies · %2$s freed</item>
+    </plurals>
+    <string name="space_restore_title">Use this copy again?</string>
+    <string name="space_restore_message">%1$s (%2$s) becomes the system set up now, with its apps and settings. The system set up now is kept as an old copy, so you can switch back the same way.</string>
+    <string name="space_restore_run">Use again</string>
+    <string name="space_restoring">Restoring…</string>
+    <string name="space_restored">Restored. Open Home: if it says Update now, tap it before you switch.</string>
+    <string name="space_not_restored">Not restored</string>
+    <string name="space_not_restored_line">Something is still in use. The reason is under Details.</string>
+    <string name="space_choose_title">%1$s</string>
+    <string name="space_choose_use">Use this system again</string>
+    <string name="space_choose_delete">Delete it</string>
     <string name="space_details_summary">Folder names, and what OneOS checks first</string>
     <string name="space_details_rules">Root deletes only an old copy OneOS kept (a folder named oneos.old-&lt;time&gt;), and not while it\'s in use: something is still open in it, a session since the last restart used it, or it\'s still linked to One UI\'s folders. A restart ends that.</string>
     <string name="space_details_folder">%1$s · image %2$s</string>

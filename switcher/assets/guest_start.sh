@@ -335,8 +335,17 @@ if [ "$LAYOUT_HIDDEN" = 1 ] && [ "${ONEOS_GUEST_FOLD:-layout}" != off ]; then
         # panels on, left out). Run 43 had only 0 and 3, so its rear display
         # state went to the inner panel. ColorOS keeps Samsung's 0 and 3.
         if [ -e /system/framework/oplus-services.jar ]; then
-            STATES="0:$COVER:$INNER 3:$INNER:$COVER"
-            LNOTE="Samsung's device states 0 (lid closed) and 3 (lid open)."
+            # Samsung's states from the phone's own device_state_configuration.xml:
+            # 0 (lid closed) on the cover, every other one on the inner panel.
+            # The Z Fold8 Ultra and Z Fold7 list 0 CLOSE and 3 OPEN; the Z Fold8
+            # (h8q) adds 1 TENT, which had no layout.
+            STATES="0:$COVER:$INNER"
+            DSC=/vendor/etc/devicestate/device_state_configuration.xml
+            for id in $(sed -n 's/.*<identifier>\([0-9][0-9]*\)<\/identifier>.*/\1/p' "$DSC" 2>/dev/null | sort -un); do
+                [ "$id" = 0 ] || STATES="$STATES $id:$INNER:$COVER"
+            done
+            [ "$STATES" != "0:$COVER:$INNER" ] || STATES="$STATES 3:$INNER:$COVER"
+            LNOTE="Samsung's device states: 0 (lid closed) on the cover, the others ($(echo "$STATES" | tr ' ' '\n' | sed -n 's/:.*//p' | grep -v '^0$' | tr '\n' ' ')) on the inner panel."
         else
             STATES="0:$COVER:$INNER 1:$INNER:$COVER 2:$INNER:$COVER 3:$COVER:$INNER"
             LNOTE="AOSP fold states 0 closed, 1 half open, 2 open, 3 rear display."
@@ -541,8 +550,10 @@ if [ "$(cat /data/oneos_vold_name 2>/dev/null)" = gvld ]; then
     # Bound by guest_prepare.sh, which checked them against guards.txt. And the
     # services.jar: one that still looked up "vold" would hand the guest
     # StorageManagerService One UI's vold (connectVold, then IVold.reset()).
-    # Its patched dex is stored, not deflated (make-overlays.sh: zip -0).
-    for f in /system/bin/vold /system/lib64/service.incremental.so /system/framework/services.jar; do
+    # Its patched dex is stored, not deflated (make-overlays.sh: zip -0). On
+    # ColorOS also oplus-services.jar (OplusStorageManagerFeature.connectVold).
+    for f in /system/bin/vold /system/lib64/service.incremental.so /system/framework/services.jar \
+             $([ -f /system/framework/oplus-services.jar ] && echo /system/framework/oplus-services.jar); do
         $BB grep -q gvld "$f" || why="$f is not the gvld build"
     done
     [ "$(cat /sys/fs/selinux/enforce 2>/dev/null)" = 1 ] && why="SELinux is enforcing: servicemanager refuses gvld (default_android_service)"

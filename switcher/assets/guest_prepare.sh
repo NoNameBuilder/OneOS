@@ -338,6 +338,88 @@ if [ $INJ = 1 ]; then
         echo "Signal poll: off ($GUEST_SYSTEM_EXT/framework/oneos-telephony.jar missing or not the staged one)"
     fi
 fi
+# Display configs for the phone's two panels in a Pixel guest (run 49), in a
+# read-only overlay on the guest's product/etc, made before anything is bound
+# into product/etc (the seapp files below). Without a display_*.xml for these
+# panels (One UI's vendor has Qualcomm reference files for other display ids)
+# the Pixel framework maps its brightness linearly onto Samsung's composer
+# float, which Samsung's composer maps linearly onto panel0-backlight
+# 0..13510 (about 2650 nits at the top): adaptive brightness aimed at the wrong
+# levels. And it had no proximity sensor: the phone's only
+# android.sensor.proximity ("Palm Proximity Sensor", handle "_ear") lives in
+# One UI's framework. Each file gives One UI's own nits -> float pairs (the
+# table of patches/OneOSPanelBacklight.smali, from One UI's SurfaceFlinger
+# logs; from 0.0026, the lowest level One UI uses, up to 520 nits, no high
+# brightness mode yet) and names Samsung's IR proximity sensor
+# (com.samsung.sensor.physical_proximity, wake-up; system_server passes its
+# SSENSOR permission). DisplayDeviceConfig reads product/etc/displayconfig
+# before vendor; display_port_147.xml is the inner panel, 148 the cover.
+# The Z Fold8 Ultra (profile f8u) only: another phone's panels have their own
+# curve (the Z Fold8's are other panels on the same ports).
+# ColorOS has its own brightness path (samsung_backlight_curve.py).
+# ONEOS_GUEST_DISPLAY_CONFIG=0 leaves it out.
+ddc_xml() {
+    cat <<'DDCEOF'
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OneOS (guest_prepare.sh): One UI's nits for Samsung's composer float on this panel, and Samsung's IR proximity sensor. -->
+<displayConfiguration>
+    <screenBrightnessMap>
+        <point><value>0.0026</value><nits>2.21</nits></point>
+        <point><value>0.00333</value><nits>3.0</nits></point>
+        <point><value>0.005015</value><nits>5.0</nits></point>
+        <point><value>0.00694</value><nits>7.5</nits></point>
+        <point><value>0.008891</value><nits>10.4</nits></point>
+        <point><value>0.012079</value><nits>15.0</nits></point>
+        <point><value>0.015279</value><nits>20.0</nits></point>
+        <point><value>0.021151</value><nits>30.0</nits></point>
+        <point><value>0.026566</value><nits>40.0</nits></point>
+        <point><value>0.03701</value><nits>60.0</nits></point>
+        <point><value>0.045723</value><nits>80.0</nits></point>
+        <point><value>0.054391</value><nits>100.0</nits></point>
+        <point><value>0.068653</value><nits>135.0</nits></point>
+        <point><value>0.082069</value><nits>170.0</nits></point>
+        <point><value>0.093062</value><nits>200.0</nits></point>
+        <point><value>0.110574</value><nits>250.0</nits></point>
+        <point><value>0.127287</value><nits>300.0</nits></point>
+        <point><value>0.158918</value><nits>400.0</nits></point>
+        <point><value>0.188764</value><nits>500.0</nits></point>
+        <point><value>0.196299</value><nits>520.0</nits></point>
+    </screenBrightnessMap>
+    <proxSensor>
+        <type>com.samsung.sensor.physical_proximity</type>
+    </proxSensor>
+</displayConfiguration>
+DDCEOF
+}
+PETC="$ROOTFS/system/product/etc"
+if [ -e "$ROOTFS/system/framework/oplus-services.jar" ] || [ -L "$ROOTFS/system/framework/oplus-services.jar" ]; then
+    :
+elif [ "${ONEOS_GUEST_DISPLAY_CONFIG:-1}" != 1 ]; then
+    echo "Display config: the image's own (ONEOS_GUEST_DISPLAY_CONFIG=0)"
+elif [ "${ONEOS_GUEST_FORM:-fold}" != fold ] || [ "${ONEOS_PROFILE:-f8u}" != f8u ]; then
+    echo "Display config: the image's own (the panel files are the Z Fold8 Ultra's; profile ${ONEOS_PROFILE:-f8u}, form ${ONEOS_GUEST_FORM:-fold})"
+elif [ ! -d "$PETC" ] || [ -L "$PETC" ]; then
+    echo "Display config: no product/etc folder in the image, left out"
+elif mount | grep -q " $PETC type overlay"; then
+    echo "Display config: overlay on product/etc already there (an earlier prepare), left as it is"
+elif [ -e "$PETC/displayconfig" ]; then
+    echo "Display config: the image has its own product/etc/displayconfig, left as it is"
+else
+    DOV="$STAGE/product_etc_ov"
+    mkdir -p "$DOV"
+    if ! mount | grep -q " $DOV "; then
+        $BB mount -t tmpfs -o size=256k,mode=755 tmpfs "$DOV" && $BB mount --make-private "$DOV" 2>/dev/null
+    fi
+    mkdir -p "$DOV/up/displayconfig"
+    for port in 147 148; do ddc_xml > "$DOV/up/displayconfig/display_port_$port.xml"; done
+    chmod 755 "$DOV/up" "$DOV/up/displayconfig" && chmod 644 "$DOV/up/displayconfig/"*.xml
+    $BB chcon -R u:object_r:system_file:s0 "$DOV/up" 2>/dev/null || true
+    if $BB mount -t overlay overlay -o "ro,lowerdir=$DOV/up:$PETC" "$PETC"; then
+        echo "Display config: product/etc/displayconfig/display_port_147.xml and 148 (One UI's nits curve, Samsung's IR proximity)"
+    else
+        echo "Display config: read-only overlay on product/etc refused, left out"
+    fi
+fi
 if mount | grep -q "$ROOTFS/mnt " || $BB mount --rbind /mnt "$ROOTFS/mnt"; then
     # rslave at once: /mnt is a recursive bind of the host's shared storage
     # (/mnt/vendor/efs, /mnt/user/0/emulated); an early-exit umount on the way
@@ -494,6 +576,9 @@ fi
 #   13:14:12 -> remove by config -> removeNetwork -> disconnected, nothing
 #   saved; the dialog left open is the Settings page that could not be left.
 #   It also turns on OplusWifi's other CN paths (self-cure, smart assistant).
+#   CN images only: my_region/build.prop says ro.oplus.pipeline.region=CN in
+#   the Find N6 and Find X9 Ultra CN builds; a global build (the X9U IN) has
+#   the export WirelessSettings and keeps its own region.
 FEAT="$GUEST_SYSTEM_EXT/etc/permissions/com.oplus.features_config.xml"
 $BB umount -l "$FEAT" 2>/dev/null
 FORM="${ONEOS_GUEST_FORM:-fold}"
@@ -516,7 +601,12 @@ if [ -f "$FEAT" ]; then
             ADDED="$ADDED oplus.software.radio.support_dual_nr"
         fi
     fi
-    [ "${ONEOS_GUEST_WIFI_CN:-1}" = 1 ] && ADDED="$ADDED oplus.software.connectivity.region_CN"
+    GUEST_REGION=$(sed -n 's/^ro\.oplus\.pipeline\.region=//p' "$ROOTFS/my_region/build.prop" 2>/dev/null | head -n 1)
+    if [ "${ONEOS_GUEST_WIFI_CN:-1}" = 1 ] && [ "$GUEST_REGION" = CN ]; then
+        ADDED="$ADDED oplus.software.connectivity.region_CN"
+    else
+        echo "Wi-Fi region_CN switch left out (image region ${GUEST_REGION:-unknown})"
+    fi
     { grep -v '</oplus-config>' "$FEAT"
       for f in $ADDED; do echo "    <oplus-feature name=\"$f\"/>"; done
       echo '</oplus-config>'; } > "$STAGE/oplus_features_config.xml"
@@ -848,6 +938,72 @@ if [ "$(head -c 3 "$SSET" 2>/dev/null)" = ABX ]; then
     echo "Guest display size: binary settings, set by the UI activator"
 else
     echo "Guest display size: $(grep -o 'name="display_density_forced" value="[^"]*"' "$SSET" 2>/dev/null || echo 'not forced')"
+fi
+# ColorOS's cover screen on a fold (owner, 0.4.10 on the Z Fold8 Ultra: "outer
+# display looks 720p", "set to high, still looks blurry"). The guest drew it at
+# the panel's full 1080 x 2520 (SurfaceFlinger: 1:1 projection, full-size
+# window buffers), but at Samsung's shared ro.sf.lcd_density 480, a 360 dp wide
+# phone layout, about 14% larger than One UI's 420 on the same 422 dpi panel.
+# The cover gets its own forced density in the guest's display_settings.xml,
+# keyed like WindowManager keys it (the uniqueId, or port:<n> when the file
+# says identifier 1), so the inner panel and Settings.Secure
+# display_density_forced (display 0 at boot, whichever panel it is) stay as
+# they are: auto = the panel's real dpi down to a multiple of 20 (420 here,
+# also one of ColorOS's own display sizes), only under the base density, and
+# never over a size chosen in ColorOS (an entry with forcedDensity).
+# ONEOS_GUEST_COVER_DENSITY=off|auto|<dpi 120-640>.
+DSET="$STAGE/data/system/display_settings.xml"
+CVD=$(cat "$STAGE/host_cover_display" 2>/dev/null)
+CDEN="${ONEOS_GUEST_COVER_DENSITY:-auto}"
+if [ "$FORM" != fold ] || [ ! -e "$ROOTFS/system/framework/oplus-services.jar" ] || [ "$CDEN" = off ]; then
+    :
+elif [ "$(echo "$CVD" | wc -w)" != 5 ]; then
+    echo "Cover density: not set (the cover panel was not read)"
+else
+    set -- $CVD
+    CV_UID=$1 CV_PORT=$2 CV_XDPI=$5
+    BASE=$(getprop ro.sf.lcd_density)
+    case "$CDEN" in
+        auto) CDEN=$((CV_XDPI / 20 * 20)) ;;
+        [1-9][0-9][0-9]) [ "$CDEN" -ge 120 ] && [ "$CDEN" -le 640 ] || CDEN=0 ;;
+        *) CDEN=0 ;;
+    esac
+    if [ "$CDEN" -lt 120 ] 2>/dev/null || [ -z "$BASE" ] || [ "$CDEN" -ge "$BASE" ]; then
+        echo "Cover density: left at ${BASE:-the base} (${ONEOS_GUEST_COVER_DENSITY:-auto} gives $CDEN for $CV_XDPI dpi)"
+    else
+        mkdir -p "$STAGE/data/system"
+        DTXT="$STAGE/display_settings.txt"
+        rm -f "$DTXT"
+        if [ ! -s "$DSET" ]; then
+            printf '%s\n' "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>" '<display-settings>' '</display-settings>' > "$DTXT"
+        elif [ "$(head -c 3 "$DSET")" = ABX ]; then
+            abx2xml "$DSET" "$DTXT" 2>/dev/null || rm -f "$DTXT"
+        else
+            cp "$DSET" "$DTXT"
+        fi
+        IDT=$(sed -n 's/.*<config identifier="\([0-9]*\)".*/\1/p' "$DTXT" /vendor/etc/display_settings.xml 2>/dev/null | head -n 1)
+        CV_NAME=$CV_UID; [ "$IDT" = 1 ] && CV_NAME="port:$CV_PORT"
+        if [ ! -s "$DTXT" ] || ! grep -q '</display-settings>' "$DTXT"; then
+            echo "Cover density: not set (display_settings.xml not readable)"
+        elif grep "<display name=\"$CV_NAME\"" "$DTXT" | grep -q 'forcedDensity='; then
+            echo "Cover density: $(grep "<display name=\"$CV_NAME\"" "$DTXT" | sed -n 's/.*forcedDensity="\([0-9]*\)".*/\1/p') kept (chosen in ColorOS)"
+        else
+            if grep -q "<display name=\"$CV_NAME\"" "$DTXT"; then
+                sed -i "s|<display name=\"$CV_NAME\"|<display name=\"$CV_NAME\" forcedDensity=\"$CDEN\"|" "$DTXT"
+            else
+                awk -v e="<display name=\"$CV_NAME\" forcedDensity=\"$CDEN\" />" '/<\/display-settings>/ { print e } { print }' "$DTXT" > "$DTXT.new" && mv -f "$DTXT.new" "$DTXT"
+            fi
+            CTX=$(ls -Z "$DSET" 2>/dev/null | awk '{ print $1 }')
+            case "$CTX" in u:object_r:*) ;; *) CTX=u:object_r:system_data_file:s0 ;; esac
+            if grep -q "forcedDensity=\"$CDEN\"" "$DTXT" && mv -f "$DTXT" "$DSET"; then
+                chown 1000:1000 "$DSET"; chmod 600 "$DSET"; $BB chcon "$CTX" "$DSET" 2>/dev/null
+                echo "Cover density: $CDEN for $CV_NAME ($CV_XDPI dpi panel, base $BASE)"
+            else
+                echo "Cover density: not set (display_settings.xml not written)"
+            fi
+        fi
+        rm -f "$DTXT" "$DTXT.new"
+    fi
 fi
 
 # ColorOS's touch-idle refresh rate (OTI, oplus_vrr_config.json "touch_idle")
@@ -2139,6 +2295,30 @@ fi
 if [ -d "$GUEST_SYSTEM_EXT/app/PersistentBackgroundCameraServices" ]; then
     $BB mount -t tmpfs -o ro,size=4k,mode=755 tmpfs "$GUEST_SYSTEM_EXT/app/PersistentBackgroundCameraServices" && \
         echo "Hid guest system_ext/app/PersistentBackgroundCameraServices (services only Pixel's VINTF declares)"
+fi
+# The phone's eSIM chip is shared hardware, and an eSIM manager (LPA) in the
+# guest drives it directly: Pixel's EuiccGoogle opens the chip's ISD-R channel
+# itself (run 43). A guest factory reset with "Erase eSIMs", Reset mobile
+# network settings with "Erase downloaded SIMs", Erase SIM in the guest's SIM
+# settings, or Find My Device's remote erase once a Google account is signed
+# in, would delete One UI's eSIM profiles for good (the BCB and FRP guards
+# stop the rest of such a wipe, not this part). Without an LPA the guest still
+# uses the eSIM One UI left enabled (the modem runs it like a SIM card: calls,
+# SMS, data); it cannot download, switch or erase profiles, and Settings hides
+# those options. Every Euicc* app folder but RROs and permission-only
+# packages: Pixel's product EuiccGoogle and system_ext EuiccSupportPixel-P23,
+# the Find X9 Ultra's my_product EuiccOplus (the Find N6 has none).
+# ONEOS_GUEST_ESIM_MANAGER=1 keeps them.
+if [ "${ONEOS_GUEST_ESIM_MANAGER:-0}" != 1 ]; then
+    for d in "$ROOTFS"/system/priv-app/Euicc* "$ROOTFS"/system/app/Euicc* \
+             "$ROOTFS"/system/product/priv-app/Euicc* "$ROOTFS"/system/product/app/Euicc* \
+             "$GUEST_SYSTEM_EXT"/priv-app/Euicc* "$GUEST_SYSTEM_EXT"/app/Euicc* \
+             "$ROOTFS"/my_*/priv-app/Euicc* "$ROOTFS"/my_*/app/Euicc*; do
+        [ -d "$d" ] && [ ! -L "$d" ] || continue
+        case ${d##*/} in *Overlay|*Permissions) continue ;; esac
+        $BB mount -t tmpfs -o ro,size=4k,mode=755 tmpfs "$d" && \
+            echo "Hid guest ${d#"$ROOTFS"/} (eSIM manager: the eSIM chip is One UI's; ONEOS_GUEST_ESIM_MANAGER=1 keeps it)"
+    done
 fi
 # Google Play services (GMS_WANT, top; docs/pixel-guest.md). GmsCore is
 # presented as a plain product priv-app, as Pixels had it before Android 17,

@@ -11,8 +11,9 @@ class PackageSetsTest {
     private val n6 = PackageSets.N6_F8U
     private val x9u = PackageSets.X9U_SULTRA
     private val pixel = PackageSets.PIXEL_F8U
+    private val xin = PackageSets.X9U_IN_SULTRA
 
-    /** sha256sum of out/overlays, out/overlays_x9u (2026-10-22) and out/overlays_pixel_yogi (2026-10-24) without the omitted files. */
+    /** sha256sum of out/overlays_n6_r50, out/overlays_x9u_r50, out/overlays_x9u_in_r50 (2026-10-25) and out/overlays_pixel_yogi (2026-10-24) without the omitted files. */
     private fun shas(set: PackageSet) = Bundles.text("packages/${set.id}.sha256")
 
     private fun guards(set: PackageSet) = Bundles.text("packages/${set.id}.guards.txt")
@@ -26,16 +27,18 @@ class PackageSetsTest {
 
     @Test
     fun setsAsData() {
-        assertEquals(22, n6.files.size)
-        assertEquals(21, x9u.files.size)
+        assertEquals(25, n6.files.size)
+        assertEquals(24, x9u.files.size)
         assertEquals(31, pixel.files.size)
         assertEquals(Images.ID_FIND_N6, n6.imageId)
         assertEquals(Images.ID_FIND_X9U, x9u.imageId)
         assertEquals(Images.ID_PIXEL_YOGI, pixel.imageId)
-        assertEquals("out/overlays", n6.sourceDir)
-        assertEquals("out/overlays_x9u", x9u.sourceDir)
+        assertEquals("out/overlays_n6_r50", n6.sourceDir)
+        assertEquals("out/overlays_x9u_r50", x9u.sourceDir)
+        assertEquals("out/overlays_x9u_in_r50", xin.sourceDir)
+        assertEquals(Images.ID_FIND_X9U_IN, xin.imageId)
         assertEquals("out/overlays_pixel_yogi", pixel.sourceDir)
-        assertEquals(listOf(n6, x9u, pixel), PackageSets.ALL)
+        assertEquals(listOf(n6, x9u, xin, pixel, PackageSets.PIXEL_SULTRA), PackageSets.ALL)
         // Owner: leave out only dead weight.
         assertEquals(listOf("tethering_payload.img"), n6.omitted)
         assertEquals(listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk"), x9u.omitted)
@@ -54,24 +57,48 @@ class PackageSetsTest {
             // Back to One UI in the guest exactly when the set stages the in-guest app (guest_prepare.sh installs it).
             assertEquals(s.id, PackageSets.GUEST_APP in s.names, s.hasReturnApp)
         }
-        // The ColorOS sets are as they were (0.3.6).
+        // The ColorOS sets (0.4.8, rebuilt 2026-10-25): both guard jars, the guest vold
+        // as gvld (ColorOS 17 CP2A.260605.016) and the in-guest app.
         for (s in listOf(n6, x9u)) {
             assertEquals(listOf("services_patched.jar", "oplus-services_patched.jar"), s.files.filter { it.role == FileRole.GUARD_JAR }.map { it.name })
-            assertEquals(s.id, listOf("services_patched.jar", "oplus-services_patched.jar"), s.files.filter { it.role in PackageFile.GUARDED }.map { it.name })
+            assertEquals(
+                s.id,
+                listOf("services_patched.jar", "oplus-services_patched.jar", "vold_patched", "service.incremental_patched.so"),
+                s.files.filter { it.role in PackageFile.GUARDED }.map { it.name },
+            )
             assertEquals(s.id, 15, s.files.count { it.role == FileRole.APEX_PAYLOAD })
             assertEquals(FileRole.SURFACEFLINGER, s.file("surfaceflinger_patched")!!.role)
-            assertFalse(s.hasReturnApp)
+            assertEquals(FileRole.GUEST_APP, s.file(PackageSets.GUEST_APP)!!.role)
+            assertTrue(s.hasReturnApp)
         }
         assertEquals(n6.names - PackageSets.WALLPAPER_GRID_RRO, x9u.names)
+        // The IN build's set (0.4.11): the CN set's files and its cell broadcast module, with
+        // both guard jars and its own guest vold as gvld (its own pins in make-overlays.sh).
+        assertEquals(x9u.names + PackageSets.CELLBROADCAST, xin.names)
+        assertEquals(x9u.omitted, xin.omitted)
+        assertEquals(16, xin.files.count { it.role == FileRole.APEX_PAYLOAD })
+        assertEquals(
+            listOf("services_patched.jar", "oplus-services_patched.jar", "vold_patched", "service.incremental_patched.so"),
+            xin.files.filter { it.role in PackageFile.GUARDED }.map { it.name },
+        )
+        assertTrue(xin.hasReturnApp)
+        val inShas = ShaList.parse(shas(xin)).entries
+        // Its vold is not the CN one (the same code laid out 0x2000 later), so neither is its patch.
+        assertTrue(inShas["vold_patched"] != ShaList.parse(shas(x9u)).entries["vold_patched"])
+        assertEquals(ShaList.parse(shas(x9u)).entries[PackageSets.GUEST_APP], inShas[PackageSets.GUEST_APP])
         assertEquals(FileRole.RRO, n6.file("OneOSWallpapersFoldGrid.apk")!!.role)
-        // 15 of the files are byte-identical in both ColorOS sets (deduplicated in the APK).
+        // 18 of the files are byte-identical in both ColorOS sets (deduplicated in the APK):
+        // 14 payloads, surfaceflinger, the in-guest app and the guest vold's two binaries
+        // (the images share one vold and service.incremental.so).
         val a = ShaList.parse(shas(n6)).entries
         val b = ShaList.parse(shas(x9u)).entries
-        assertEquals(15, a.count { (n, h) -> b[n] == h })
-        // The Pixel set's files are all its own: nothing shared with the ColorOS sets.
+        assertEquals(18, a.count { (n, h) -> b[n] == h })
+        for (n in listOf("vold_patched", "service.incremental_patched.so", PackageSets.GUEST_APP)) assertEquals(n, a[n], b[n])
+        // The Pixel set's files are its own but the in-guest app, the same build in every set.
         val c = ShaList.parse(shas(pixel)).entries
         val colorOs = (a.values + b.values).toSet()
-        assertEquals(emptyMap<String, String>(), c.filterValues { it in colorOs })
+        assertEquals(setOf(PackageSets.GUEST_APP), c.filterValues { it in colorOs }.keys)
+        assertEquals(c[PackageSets.GUEST_APP], a[PackageSets.GUEST_APP])
     }
 
     /** 0.3.7: exactly the files a Pixel session uses (guest_prepare.sh), with their roles. */
@@ -122,14 +149,14 @@ class PackageSetsTest {
         for (s in PackageSets.ALL) assertEquals(s.id, emptyList<String>(), s.check(shas(s)))
         // The Pixel list and a ColorOS one are not interchangeable.
         val pixelOnN6 = pixel.check(shas(n6))
-        assertTrue(pixelOnN6.contains("pixel-f8u: vold_patched missing"))
-        assertTrue(pixelOnN6.contains("pixel-f8u: OneOSGuest.apk missing"))
+        assertTrue(pixelOnN6.contains("pixel-f8u: oneos-telephony.jar missing"))
+        assertTrue(pixelOnN6.contains("pixel-f8u: gmssystem_payload.img missing"))
         assertTrue(pixelOnN6.contains("pixel-f8u: oplus-services_patched.jar is not in this set"))
         assertTrue(pixelOnN6.contains("pixel-f8u: OneOSWallpapersFoldGrid.apk is not in this set"))
         val n6OnPixel = n6.check(shas(pixel))
         assertTrue(n6OnPixel.contains("n6-f8u: surfaceflinger_patched missing"))
-        assertTrue(n6OnPixel.contains("n6-f8u: vold_patched is not in this set"))
-        assertTrue(n6OnPixel.contains("n6-f8u: OneOSGuest.apk is not in this set"))
+        assertTrue(n6OnPixel.contains("n6-f8u: oneos-telephony.jar is not in this set"))
+        assertTrue(n6OnPixel.contains("n6-f8u: OneOSPixelStatusBar.apk is not in this set"))
         assertTrue(x9u.check(shas(pixel)).contains("x9u-sultra: cellbroadcast_payload.img is not in this set"))
         val pixelTether = shas(pixel) + "${"a".repeat(64)}  tethering_payload.img\n"
         assertEquals(listOf("pixel-f8u: tethering_payload.img is left out of this set"), pixel.check(pixelTether))
@@ -148,15 +175,16 @@ class PackageSetsTest {
     @Test
     fun guardsMatchTheGuardJars() {
         for (s in PackageSets.ALL) assertEquals(s.id, emptyList<String>(), s.checkGuards(guards(s), shas(s)))
-        // N6 guards with the X9U jars: never mix builds.
+        // N6 guards with the X9U jars: never mix builds. (The two images share one
+        // vold and service.incremental.so, so only the guard jars differ.)
         val mixed = x9u.checkGuards(guards(n6), shas(x9u))
         assertEquals(2, mixed.size)
         assertTrue(mixed.all { it.startsWith("guards.txt: ") && it.contains("the set has") })
         // A guards.txt that lists something else, or misses a jar.
         assertTrue(x9u.checkGuards(guards(x9u) + "${"b".repeat(64)}  framework_patched.jar\n", shas(x9u)).single().contains("not a guard jar"))
         assertTrue(x9u.checkGuards(guards(x9u).lines().filterNot { it.endsWith("oplus-services_patched.jar") }.joinToString("\n"), shas(x9u)).single().contains("missing"))
-        // A ColorOS set's guards need no Google services guards (its guards.txt names none of them).
-        for (t in PackageSets.GMS_GUARDS) assertFalse(t, Regex("\\b$t\\b").containsMatchIn(guards(n6)))
+        // The ColorOS sets carry the guards Google services need too (rebuilt 2026-10-25).
+        for (s in listOf(n6, x9u)) for (t in PackageSets.GMS_GUARDS) assertTrue("${s.id} $t", Regex("\\b$t\\b").containsMatchIn(guards(s)))
     }
 
     /** 0.3.7: the Pixel set's guards.txt pins services_patched.jar and both gvld binaries; comment lines are fine. */
@@ -183,13 +211,13 @@ class PackageSetsTest {
         assertEquals(1, pixel.checkGuards(g.replace("appid15000", "appid"), sums).size)
         // Never mixed: a ColorOS set's guards do not vouch for the Pixel files, nor the other way round.
         val colorOsOnPixel = pixel.checkGuards(guards(n6), sums)
-        assertTrue(colorOsOnPixel.contains("guards.txt: vold_patched missing"))
-        assertTrue(colorOsOnPixel.contains("guards.txt: service.incremental_patched.so missing"))
+        assertTrue(colorOsOnPixel.any { it.startsWith("guards.txt: vold_patched is ") })
+        assertTrue(colorOsOnPixel.any { it.startsWith("guards.txt: service.incremental_patched.so is ") })
         assertTrue(colorOsOnPixel.contains("guards.txt: oplus-services_patched.jar is not a guard jar of pixel-f8u"))
         assertTrue(colorOsOnPixel.any { it.startsWith("guards.txt: services_patched.jar is ") })
         val pixelOnN6 = n6.checkGuards(g, shas(n6))
-        assertTrue(pixelOnN6.contains("guards.txt: vold_patched is not a guard jar of n6-f8u"))
-        assertTrue(pixelOnN6.contains("guards.txt: service.incremental_patched.so is not a guard jar of n6-f8u"))
+        assertTrue(pixelOnN6.any { it.startsWith("guards.txt: vold_patched is ") })
+        assertTrue(pixelOnN6.any { it.startsWith("guards.txt: service.incremental_patched.so is ") })
         assertTrue(pixelOnN6.contains("guards.txt: oplus-services_patched.jar missing"))
         assertTrue(x9u.checkGuards(g, shas(x9u)).isNotEmpty())
     }

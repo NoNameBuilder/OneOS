@@ -35,9 +35,18 @@
 #                                     their names up to 0.3.6), its size, image
 #                                     and state
 #   purge <name>                      delete one of those (0.3.5), after checks
+#   restore <name>                    use a set-aside stage again (0.4.10): the
+#                                     stage moves aside, oneos.old-<name> back
 #
 # Writes: only under $STAGE. Documented exceptions, nothing else:
 #   - begin aside renames $STAGE to its sibling $STAGE.old-<epoch>;
+#   - restore renames $STAGE to $STAGE.old-<epoch> and one
+#     oneos.old-<epoch>[-<pid>] that has a stage marker to $STAGE, only when
+#     neither has anything mounted at or under it in any readable mount table,
+#     no loop device uses a file in either, no bridge is up and neither holds
+#     a session still open or one that never returned (a session earlier in
+#     this boot that returned is fine); if the second rename fails, the first
+#     is undone;
 #   - purge renames one oneos.old-<epoch>[-<pid>] to oneos.trash-<epoch>
 #     and deletes it, only when it is root's, not a link, nothing is mounted
 #     at or under it in any readable mount table, no loop device uses a file
@@ -95,26 +104,37 @@ IMAGE_SDK=37
 INSTALLD_SHA=791e52c441b62944f88244a2610b9433c869c9c3916a49f43d14552de82280f2
 # Session scripts from switcher/assets plus the expected installd table.
 SCRIPTS="oneos_switch.sh guest_prepare.sh guest_start.sh guest_props.sh return_to_oneui.sh check_host_apex.sh bridges.sh zygote_exec host_installd.txt"
-SET_COMMON="services_patched.jar oplus-services_patched.jar ims-ext-common_patched.jar oplus-telephony-common_patched.jar surfaceflinger_patched guards.txt art_payload.img i18n_payload.img runtime_payload.img sdkext_payload.img crashrecovery_payload.img extservices_payload.img permission_payload.img wifi_payload.img appsearch_payload.img mediaprovider_payload.img adservices_payload.img rkpd_payload.img healthfitness_payload.img ondevicepersonalization_payload.img configinfrastructure_payload.img"
-# The Pixel set (0.3.7): services.jar with the guest vold as gvld, the signal
+SET_COMMON="services_patched.jar oplus-services_patched.jar vold_patched service.incremental_patched.so OneOSGuest.apk ims-ext-common_patched.jar oplus-telephony-common_patched.jar surfaceflinger_patched guards.txt art_payload.img i18n_payload.img runtime_payload.img sdkext_payload.img crashrecovery_payload.img extservices_payload.img permission_payload.img wifi_payload.img appsearch_payload.img mediaprovider_payload.img adservices_payload.img rkpd_payload.img healthfitness_payload.img ondevicepersonalization_payload.img configinfrastructure_payload.img"
+# The Pixel sets (the Fold's 0.3.7, the S26 Ultra's 0.4.10): services.jar with the guest vold as gvld, the signal
 # poll, Pixel's status bar RRO, the in-guest OneOS app and its own payloads.
 SET_PIXEL="services_patched.jar vold_patched service.incremental_patched.so guards.txt oneos-telephony.jar oneos-telephony.sha256 OneOSPhoneInjection.apk OneOSPixelStatusBar.apk OneOSGuest.apk art_payload.img i18n_payload.img runtime_payload.img sdkext_payload.img crashrecovery_payload.img extservices_payload.img permission_payload.img wifi_payload.img appsearch_payload.img mediaprovider_payload.img adservices_payload.img rkpd_payload.img healthfitness_payload.img ondevicepersonalization_payload.img configinfrastructure_payload.img cellbroadcast_payload.img bt_payload.img nfcservices_payload.img telephonycore_payload.img conscrypt_payload.img profiling_payload.img gmssystem_payload.img"
 # Host /data trees of switcher/assets/bridges.sh (relative to /data).
 BRIDGE_HOSTS="app app-staging user user_de dalvik-cache misc/profiles data media misc/user misc_ce/0/sdksandbox misc_de/0/sdksandbox misc_ce/0/rollback misc_de/0/rollback resource-cache"
 ENV_KEYS="ONEOS_APP ONEOS_PROFILE ONEOS_SPLASH_COMPONENT ONEOS_WALLPAPER_PROBE ONEOS_RECORD ONEOS_LOGCAT ONEOS_GUEST_FORM ONEOS_GUEST_FOLD ONEOS_COVER_TSP ONEOS_GUEST_FOLD_CONTINUE ONEOS_GUEST_UNFOLD_PORTRAIT ONEOS_GUEST_COMPACT_WINDOW ONEOS_GUEST_WALLPAPER_GRID ONEOS_GUEST_HIDE_GMS ONEOS_RETURN_MODE"
 # Images whose Google services a session may hide (ONEOS_GUEST_HIDE_GMS=1;
-# ImageRef.gmsHideable). None in 0.3.7: the Pixel image has them, but its
-# sessions present its own GmsCore, and oneos_switch.sh refuses to hide that.
-IMAGES_GMS=""
+# ImageRef.gmsHideable): the Find X9 Ultra IN build (again from 0.4.11). The
+# Pixel images have them too, but their sessions present their own GmsCore,
+# and oneos_switch.sh refuses to hide that.
+IMAGES_GMS="coloros17-findx9u-in"
 
 # <id>: <model prefix> <codename> <SoC> <form>. Enabled profiles only (the
-# S25 Ultra from 0.3.1, the Galaxy S25 from 0.3.4).
+# S25 Ultra from 0.3.1, the Galaxy S25 from 0.3.4, the Z Fold7 from 0.4.8,
+# the Galaxy S25+ and the Z Fold8 from 0.4.10).
 profile_info() {
     case "$1" in
         f8u) echo "SM-F976 q8q SM8850 fold" ;;
         s-ultra-8850) echo "SM-S948 m3q SM8850 bar" ;;
         s-ultra-8750) echo "SM-S938 pa3q SM8750 bar" ;;
         s-8750) echo "SM-S931 pa1q SM8750 bar" ;;
+        f7) echo "SM-F966 q7q SM8750 fold" ;;
+        s-plus-8750) echo "SM-S936 pa2q SM8750 bar" ;;
+        f8) echo "SM-F971 h8q SM8850 fold" ;;
+        s-8850) echo "SM-S942 m1q SM8850 bar" ;;
+        s-8850-jp) echo "SC-51G m1q SM8850 bar" ;;
+        s-ultra-8650) echo "SM-S928 e3q SM8650 bar" ;;
+        s-8550) echo "SM-S911 dm1q SM8550 bar" ;;
+        s-plus-8550) echo "SM-S916 dm2q SM8550 bar" ;;
+        s-plus-8850) echo "SM-S947 m2q SM8850 bar" ;;
         *) return 1 ;;
     esac
 }
@@ -126,9 +146,33 @@ profile_set() {
     case "$1 $2" in
         "f8u coloros17-findn6") echo n6-f8u ;;
         "f8u pixel11fold-yogi") echo pixel-f8u ;;
+        "s-ultra-8850 coloros17-findx9u-in") echo x9u-in-sultra ;;
         "s-ultra-8850 coloros17-findx9u") echo x9u-sultra ;;
+        "s-ultra-8850 pixel11pro-kodiak") echo pixel-sultra ;;
+        "s-ultra-8750 coloros17-findx9u-in") echo x9u-in-sultra ;;
         "s-ultra-8750 coloros17-findx9u") echo x9u-sultra ;;
+        "s-8750 coloros17-findx9u-in") echo x9u-in-sultra ;;
         "s-8750 coloros17-findx9u") echo x9u-sultra ;;
+        "f7 coloros17-findn6") echo n6-f8u ;;
+        "s-plus-8750 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-plus-8750 coloros17-findx9u") echo x9u-sultra ;;
+        "f8 coloros17-findn6") echo n6-f8u ;;
+        "f8 pixel11fold-yogi") echo pixel-f8u ;;
+        "s-8850 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-8850 coloros17-findx9u") echo x9u-sultra ;;
+        "s-8850 pixel11pro-kodiak") echo pixel-sultra ;;
+        "s-8850-jp coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-8850-jp coloros17-findx9u") echo x9u-sultra ;;
+        "s-8850-jp pixel11pro-kodiak") echo pixel-sultra ;;
+        "s-ultra-8650 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-ultra-8650 coloros17-findx9u") echo x9u-sultra ;;
+        "s-8550 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-8550 coloros17-findx9u") echo x9u-sultra ;;
+        "s-plus-8550 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-plus-8550 coloros17-findx9u") echo x9u-sultra ;;
+        "s-plus-8850 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-plus-8850 coloros17-findx9u") echo x9u-sultra ;;
+        "s-plus-8850 pixel11pro-kodiak") echo pixel-sultra ;;
         *) return 1 ;;
     esac
 }
@@ -143,7 +187,9 @@ image_raw() {
     case "$1" in
         coloros17-findn6) echo "10276003840 bdf5ef00aee3333758afdde152a29e0d2ca7bdaf89029ccd74bad34eec5bf444" ;;
         coloros17-findx9u) echo "10385141760 302467fc4e77998e84c10e037326508a39ab9e4be34058b751f0a768c7ff23e7" ;;
+        coloros17-findx9u-in) echo "12069945344 a36ef550f4b2530fb9c7c6d363180d9eb4437e0497ebc87292697e4bf2a580b0" ;;
         pixel11fold-yogi) echo "6559223808 8b303c37916288545b3b4a317c368d89680b5c3ce09873dc764381ddd0e32830" ;;
+        pixel11pro-kodiak) echo "6529871872 ac661a520263fa73a2b9996f19763350457b1558863d1dc15326a365ce1784c6" ;;
         *) return 1 ;;
     esac
 }
@@ -152,7 +198,9 @@ set_files() {
     case "$1" in
         n6-f8u) echo "$SET_COMMON OneOSWallpapersFoldGrid.apk" ;;
         x9u-sultra) echo "$SET_COMMON" ;;
+        x9u-in-sultra) echo "$SET_COMMON cellbroadcast_payload.img" ;;
         pixel-f8u) echo "$SET_PIXEL" ;;
+        pixel-sultra) echo "$SET_PIXEL" ;;
         *) return 1 ;;
     esac
 }
@@ -162,7 +210,9 @@ set_image() {
     case "$1" in
         n6-f8u) echo coloros17-findn6 ;;
         x9u-sultra) echo coloros17-findx9u ;;
+        x9u-in-sultra) echo coloros17-findx9u-in ;;
         pixel-f8u) echo pixel11fold-yogi ;;
+        pixel-sultra) echo pixel11pro-kodiak ;;
         *) return 1 ;;
     esac
 }
@@ -173,8 +223,8 @@ set_image() {
 # (Pixel's launcher, com.google.android.apps.nexuslauncher) (data_family).
 image_family() {
     case "$1" in
-        coloros17-findn6|coloros17-findx9u) echo coloros ;;
-        pixel11fold-yogi) echo pixel ;;
+        coloros17-findn6|coloros17-findx9u|coloros17-findx9u-in) echo coloros ;;
+        pixel11fold-yogi|pixel11pro-kodiak) echo pixel ;;
         *) return 1 ;;
     esac
 }
@@ -945,6 +995,50 @@ do_purge() {
     say "@@OK purge $asked"
 }
 
+# Use a set-aside stage again (0.4.10). Like purge's checks, but a session
+# earlier in this boot that returned is fine (session_this_boot would refuse
+# it): only a session still running or one that never returned stops it.
+restore_checks() { # <path>
+    d=$1
+    [ -d "$d" ] && [ ! -L "$d" ] && [ "$(stat -c %u "$d" 2>/dev/null)" = "$ROOT_UID" ] ||
+        refuse "${d#$T} is not a root-owned folder"
+    m=$(mounted_anywhere "$d" | head -n 3 | tr '\n' ' ')
+    [ -z "$m" ] || refuse "something is mounted in ${d#$T}: $m- return to One UI, or restart the phone"
+    l=$(backed_by_files_in "$d" | tr '\n' ' ')
+    [ -z "$l" ] || refuse "a loop device uses a file in ${d#$T}: $l- restart the phone first"
+    [ ! -f "$d/persist_session.active" ] || refuse "${d#$T} holds a session that never returned: restore One UI's settings first (Last session)"
+    if [ -f "$d/guest_props.boot" ] && [ "$(cat "$d/guest_props.boot" 2>/dev/null)" = "$(boot_id)" ]; then
+        refuse "${d#$T} has a session running"
+    fi
+}
+do_restore() {
+    [ $# -eq 1 ] || usage "restore <name>"
+    case "$1" in oneos.old-*) ;; *) usage "restore: '$1' is not a set-aside stage (oneos.old-<time>)" ;; esac
+    old_name_ok "$1" || usage "restore: '$1' is not an old stage name"
+    mountinfo_ok
+    RFROM="$OLD_PARENT/$1"
+    [ "$RFROM" != "$STAGE" ] || refuse "that is the active stage"
+    [ -f "$RFROM/.oneos_stage" ] && [ ! -L "$RFROM/.oneos_stage" ] || refuse "$1 has no stage marker: OneOS did not set it up"
+    [ -d "$RFROM/bin" ] && [ ! -L "$RFROM/bin" ] || refuse "$1 has no bin folder: not a whole stage"
+    mine "$RFROM" && mine "$RFROM/bin" || refuse "$1 or its bin folder is not root's alone (writable by others)"
+    b=$(bridged | head -n 3 | tr '\n' ' ')
+    [ -z "$b" ] || refuse "still bridged from a session: $b- restart the phone first"
+    restore_checks "$RFROM"
+    restore_checks "$STAGE"
+    OLD="$STAGE.old-$(date +%s)"
+    [ -e "$OLD" ] && OLD="$OLD-$$"
+    [ ! -e "$OLD" ] || refuse "${OLD#$T} exists already"
+    step "aside ${STAGE#$T}"
+    mv "$STAGE" "$OLD" || die "could not move the stage aside"
+    step "restore $1"
+    if ! mv "$RFROM" "$STAGE"; then
+        mv "$OLD" "$STAGE" || die "could not restore $1, nor put the stage back from ${OLD#$T}"
+        die "could not restore $1; the stage is as it was"
+    fi
+    say "@@RESULT restored $1 ${OLD##*/}"
+    say "@@OK restore $1"
+}
+
 # --- The names up to app 0.3.6 ------------------------------------------------
 # The stage was lineage_stage (the name OneLineage gave it), its copies
 # lineage_stage.old-<epoch>[-<pid>] and lineage_stage.trash-<epoch>. Before its
@@ -1018,7 +1112,7 @@ migrate_legacy() { # <stage|copies>
 [ -n "$T" ] || [ "$(id -u)" = 0 ] || refuse "not root"
 verb=$1
 case "$verb" in
-    begin|receive|keep-raw|table|env|finish|launch|recover) migrate_legacy stage ;;
+    begin|receive|keep-raw|table|env|finish|launch|recover|restore) migrate_legacy stage ;;
     old-list|purge) migrate_legacy copies ;;
 esac
 [ -d "$STAGE" ] && mine "$STAGE" || refuse "$STAGE is not root's folder"
@@ -1035,5 +1129,6 @@ case "$verb" in
     recover) do_recover "$@" ;;
     old-list) do_old_list "$@" ;;
     purge) do_purge "$@" ;;
+    restore) do_restore "$@" ;;
     *) usage "unknown verb '$verb'" ;;
 esac

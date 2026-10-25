@@ -251,7 +251,7 @@ class StageStatusTest {
         assertTrue(lying.ours)
         assertEquals(listOf(a), lying.beginModes(n6.id))
         // An image no build knows (a retired one): no family to compare, the marker still decides.
-        assertEquals(listOf(k, a), foreignPixel.beginModes("coloros17-findx9u-in"))
+        assertEquals(listOf(k, a), foreignPixel.beginModes("coloros16-findx8u"))
     }
 
     @Test
@@ -309,7 +309,7 @@ class StageStatusTest {
             status(prepared(mapOf("stage.list" to preparedFor(image, set, fold).getValue("stage.list") + extra), image = image, set = set, profile = fold))
                 .verify(fold, image, set)
         // The Pixel set's files in a ColorOS stage.
-        for (n in listOf("vold_patched", "service.incremental_patched.so", "OneOSGuest.apk", "oneos-telephony.jar", "oneos-telephony.sha256", "gmssystem_payload.img")) {
+        for (n in listOf("OneOSPixelStatusBar.apk", "OneOSPhoneInjection.apk", "oneos-telephony.jar", "oneos-telephony.sha256", "gmssystem_payload.img")) {
             assertTrue(n, problems(Images.FIND_N6, PackageSets.N6_F8U, "f 0 644 10 $n\n").contains("$n is in the stage but was not prepared"))
         }
         // ColorOS's files in the Pixel stage.

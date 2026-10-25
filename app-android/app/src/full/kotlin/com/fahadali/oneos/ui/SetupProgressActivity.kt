@@ -11,6 +11,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.Fragment
 import com.fahadali.oneos.R
@@ -19,6 +20,7 @@ import com.fahadali.oneos.core.model.ImageRef
 import com.fahadali.oneos.core.model.Images
 import com.fahadali.oneos.core.model.Profiles
 import com.fahadali.oneos.core.model.Units
+import com.fahadali.oneos.session.OldStagesJob
 import com.fahadali.oneos.session.PrepareJob
 import com.fahadali.oneos.session.SessionPrefs
 import com.fahadali.oneos.session.StageCheck
@@ -73,6 +75,8 @@ class SetupProgressFragment : Fragment() {
     private var stepRows: List<View> = emptyList()
     private var titleColors: ColorStateList? = null
     private var detailsRow: View? = null
+    /** The set-aside copy the old copies were listed for (once per screen). */
+    private var listedFor: String? = null
     private var techList: LinearLayout? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -129,7 +133,10 @@ class SetupProgressFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        unsubscribe = PrepareJob.observe { bind(it) }
+        val prepare = PrepareJob.observe { bind(it) }
+        // Delete the old copy (0.4.11) runs in OldStagesJob.
+        val old = OldStagesJob.observe { bind(PrepareJob.state) }
+        unsubscribe = { prepare(); old() }
     }
 
     override fun onStop() {
@@ -374,7 +381,22 @@ class SetupProgressFragment : Fragment() {
             }
             PrepareJob.Phase.DONE -> {
                 show(primary, getString(R.string.setup_done_button)) { SystemsNav.home(a) }
-                show(secondary, null)
+                // 0.4.11: a fresh setup kept the system before as an old copy; delete it from here.
+                val aside = asideCopy(s)
+                val old = OldStagesJob.state
+                // Its size for the question: list the old copies once (read only).
+                if (aside != null && listedFor != aside && !old.busy && old.stages?.none { it.name == aside } != false) {
+                    listedFor = aside
+                    OldStagesJob.refresh(a)
+                }
+                when {
+                    aside == null -> show(secondary, null)
+                    old.deletedNames?.contains(aside) == true ->
+                        show(secondary, getString(R.string.setup_old_deleted, Units.bytes((old.freedKib ?: 0) * 1024)), enabled = false)
+                    old.phase == OldStagesJob.Phase.DELETING -> show(secondary, getString(R.string.setup_old_deleting), enabled = false)
+                    old.deletedNames != null && old.deleteFailed -> show(secondary, getString(R.string.setup_old_not_deleted), enabled = false)
+                    else -> show(secondary, getString(R.string.setup_delete_old), enabled = !old.busy) { confirmDeleteOld(aside) }
+                }
             }
             PrepareJob.Phase.STOPPED, PrepareJob.Phase.FAILED -> {
                 val fix = s.plain?.takeIf { it.action != FixAction.NONE && it.action != FixAction.ACKNOWLEDGE && it.actionLabel != null }
@@ -392,6 +414,24 @@ class SetupProgressFragment : Fragment() {
             lp.topMargin = top
             secondary.layoutParams = lp
         }
+    }
+
+    /** The copy this setup set aside (root's "aside <path>" result), as Free up space names it. */
+    private fun asideCopy(s: PrepareJob.State): String? =
+        s.infos.lastOrNull { it.startsWith("aside ") }?.substringAfter("aside ")?.trim()?.substringAfterLast('/')
+            ?.takeIf { it.startsWith("oneos.old-") }
+
+    private fun confirmDeleteOld(name: String) {
+        val ctx = requireContext()
+        // The size, when Free up space has listed it.
+        val size = OldStagesJob.state.stages?.firstOrNull { it.name == name }?.let { Units.bytes(it.kib * 1024) }
+            ?: getString(R.string.setup_old_size_unknown)
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.setup_delete_old_title)
+            .setMessage(getString(R.string.setup_delete_old_message, size))
+            .setPositiveButton(R.string.space_delete_run) { _, _ -> OldStagesJob.deleteAll(ctx, setOf(name)) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun eta(seconds: Int?): String = when {

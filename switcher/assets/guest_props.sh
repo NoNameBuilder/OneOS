@@ -218,6 +218,45 @@ add)
             echo "guest_props: $SCO left out for the session (undefined like One UI's: the guest's AudioService opens SCO through the Bluetooth stack)"
         fi
     fi
+    # LE Audio without Android's Bluetooth audio HAL (S25 Ultra, X9U CN, app
+    # 0.4.7, session e98f44ff: Bluetooth on -> com.android.bluetooth aborted
+    # 2.5 s later, 19 times in a row, "[broadcaster.cc:1532] Initialize: HAL
+    # requirements not met. Init aborted.", after "HalVersionManager: No
+    # supported HAL version"). One UI turns every LE Audio profile on
+    # (bluetooth.profile.bap.*, csip, hap, vcp, ccp, mcp), but only the SM8850
+    # phones register android.hardware.bluetooth.audio.
+    # IBluetoothAudioProviderFactory/default; the SM8750 and older ones
+    # (probe reports: S25+, Z Fold7, S24 Ultra, S23s) register only Samsung's
+    # vendor.samsung.hardware.bluetooth.audio.ISehBluetoothAudioProviderFactory,
+    # which the guest's stack does not know, and its HIDL fallback is off
+    # (no hwservicemanager for it). The guest's LE Audio broadcaster then
+    # aborts the whole Bluetooth process. On such a phone the LE Audio
+    # profiles are off for the session (memory only, One UI's values go back
+    # with remove), so classic Bluetooth starts. ONEOS_GUEST_LE_AUDIO=1 keeps
+    # them.
+    # Only `service check` (a servicemanager lookup): `service list` asks every
+    # service for its interface, and One UI's surfaceflinger is frozen behind
+    # the gap splash here, so it never answered and the switch hung before the
+    # guest started (0.4.11, S24 Ultra session 0210fa8a: OneOS logo, black,
+    # reboot). Only an explicit "not found" turns LE Audio off.
+    BTA=android.hardware.bluetooth.audio.IBluetoothAudioProviderFactory/default
+    if [ "${ONEOS_GUEST_LE_AUDIO:-0}" != 1 ] &&
+        timeout 5 service check "$BTA" 2>/dev/null | grep -q ": not found"; then
+        out=""
+        for k in bluetooth.profile.bap.broadcast.source.enabled bluetooth.profile.bap.broadcast.assist.enabled \
+                 bluetooth.profile.bap.unicast.client.enabled bluetooth.profile.csip.set_coordinator.enabled \
+                 bluetooth.profile.hap.client.enabled bluetooth.profile.vcp.controller.enabled \
+                 bluetooth.profile.ccp.server.enabled bluetooth.profile.mcp.server.enabled; do
+            drop_new "$k" && out="$out $k(guest)"
+            grep -qxF "$k" "$HOST" || continue
+            hv=$(getprop "$k")
+            if [ "$hv" != false ] && "$RP" -n "$k" false 2>/dev/null; then
+                echo "$k=$hv" >> "$OVR"
+                out="$out $k"
+            fi
+        done
+        echo "guest_props: no $BTA on this phone: LE Audio off for the session:${out:- nothing was on}"
+    fi
     # Power key stall (run 32: the power menu ~15 s late or missing after a
     # long press, Power + Volume Down screenshots late, folds handled late).
     # ColorOS's lib_inputflingerEx.so runs saupwkProcessKey on system_server's

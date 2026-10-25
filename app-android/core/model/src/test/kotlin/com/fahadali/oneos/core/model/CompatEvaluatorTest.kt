@@ -161,7 +161,7 @@ class CompatEvaluatorTest {
         val s25 = Bundles.S25.facts
         // Another S-series model, and an S25 model number with another codename or chip.
         for (f in listOf(
-            s25.copy(model = "SM-S936B", device = "pa2q"),
+            s25.copy(model = "SM-S901B", device = "r0q", soc = SocRules.resolve(SocProps("QTI", "SM8450", "taro"))),
             s25.copy(model = "SM-S921B", device = "e1q", soc = SocRules.resolve(SocProps("QTI", "SM8650", "pineapple"))),
             s25.copy(device = "pa3q"),
             s25.copy(soc = SocRules.resolve(SocProps("QTI", "SM8850", "canoe"))),
@@ -171,8 +171,10 @@ class CompatEvaluatorTest {
             val r = eval(f)
             assertEquals(f.model, Verdict.NOT_SUPPORTED, r.verdict)
             assertEquals(f.model, Level.BLOCK, r.level(CompatEvaluator.ID_OUT_OF_SCOPE))
-            // The BLOCK names the one S-series phone that has a profile.
-            assertTrue(r.find(CompatEvaluator.ID_OUT_OF_SCOPE)!!.detail.contains("Galaxy S25 (SM-S931* / pa1q / SM8750)"))
+            // The BLOCK names the S-series phones that have a profile.
+            val detail = r.find(CompatEvaluator.ID_OUT_OF_SCOPE)!!.detail
+            assertTrue(detail.contains("Galaxy S25 (SM-S931* / pa1q / SM8750)"))
+            assertTrue(detail.contains("Galaxy S26 (docomo) (SC-51G* / m1q / SM8850)"))
         }
         // The family alone still decides for the flagships.
         assertTrue(CompatEvaluator.inScope(ModelFamily.S_ULTRA, null))
@@ -202,7 +204,7 @@ class CompatEvaluatorTest {
         assertEquals(Level.BLOCK, eval(Fixtures.facts(storage = StorageInfo(need - 1, 512_000_000_000))).level("free-space-short"))
 
         assertEquals(10_276_003_840L + 11L * SpaceRule.GIB, SpaceRule.required())
-        assertEquals(10_385_141_760L + 264_033_307L + 11L * SpaceRule.GIB, SpaceRule.toStage(Images.FIND_X9U, PackageSets.X9U_SULTRA))
+        assertEquals(10_385_141_760L + 267_147_970L + 11L * SpaceRule.GIB, SpaceRule.toStage(Images.FIND_X9U, PackageSets.X9U_SULTRA))
     }
 
     @Test

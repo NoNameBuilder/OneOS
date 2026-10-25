@@ -114,8 +114,8 @@ class StageAuditTest {
         assertEquals(RootScript.SCRIPTS, shVar("SCRIPTS").split(' '))
         assertEquals(SessionEnv.ALLOWED.keys.toList(), shVar("ENV_KEYS").split(' '))
         assertEquals(Images.ALL.map { it.sdk }.distinct().single().toString(), shVar("IMAGE_SDK"))
-        // Enabled profiles only, each with its ids and form.
-        val rows = Regex("""^\s+([a-z0-9-]+)\) echo "(SM-\S+) (\S+) (\S+) (fold|bar)" ;;$""", RegexOption.MULTILINE)
+        // Enabled profiles only, each with its ids and form (SM- model numbers, and docomo's SC- ones).
+        val rows = Regex("""^\s+([a-z0-9-]+)\) echo "(S[MC]-\S+) (\S+) (\S+) (fold|bar)" ;;$""", RegexOption.MULTILINE)
             .findAll(script).associate { it.groupValues[1] to it.groupValues.drop(2) }
         val enabled = Profiles.BUILT_IN.filter { it.enabled }
         assertEquals(enabled.map { it.id }.toSet(), rows.keys)
