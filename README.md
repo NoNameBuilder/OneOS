@@ -55,9 +55,17 @@ Known open issues for each system are in `docs/pixel-guest.md` and
 `docs/coloros-on-fold.md`.
 
 Everything else (Exynos phones, other models, other images, other Android
-versions) is refused by the app's compatibility checks. **OneOS Probe**, a
-separate read-only app, reports what a phone has and shares a redacted
-findings file, so new phones can be checked without switching anything.
+versions) is refused by the app's compatibility checks.
+
+## Your phone is not listed?
+
+Run **OneOS Probe** on it. It is a separate read-only app: it changes nothing,
+and it strips the IMEI, phone numbers and Wi-Fi names from its report (it
+needs root to read the system). Tap **Run tests**, then **Share**, and post the
+zip with your phone model in **Phone reports** in the
+[OneOS Telegram group](https://t.me/TheoneOS). New releases are announced
+there too. Probe is in the same download folder as the app (see the latest
+release).
 
 ## Getting started
 
