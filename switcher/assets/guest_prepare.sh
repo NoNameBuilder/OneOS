@@ -572,6 +572,22 @@ if [ "${ONEOS_GUEST_SIGNAL_POLL:-1}" = 1 ] && [ -f "$STAGE/oplus-telephony-commo
     $BB mount --bind "$STAGE/oplus-telephony-common_patched.jar" "$GUEST_OTC"
     echo "Bound oplus-telephony-common_patched.jar -> $GUEST_OTC"
 fi
+# OneOS live-patch: oplus-framework.jar (camera: getComponentName -> getOpPackageName)
+# Staged from the app assets (x9u-in-sultra set) and bind-mounted over the guest's
+# system/framework/oplus-framework.jar before the guest zygote starts.
+if [ -f "$STAGE/oplus-framework.jar" ] && [ -e "$ROOTFS/system/framework/oplus-framework.jar" ]; then
+    $BB umount -l "$ROOTFS/system/framework/oplus-framework.jar" 2>/dev/null || true
+    $BB mount --bind "$STAGE/oplus-framework.jar" "$ROOTFS/system/framework/oplus-framework.jar"
+    echo "Bound oplus-framework.jar -> $ROOTFS/system/framework/oplus-framework.jar"
+fi
+# OneOS live-patch: SystemUI (status bar padding: halve L/R +1.25x, fix bottom)
+# Staged from the app assets (x9u-in-sultra set) and bind-mounted over the guest's
+# SystemUI.apk before the guest zygote starts.
+if [ -f "$STAGE/SystemUI_patched.apk" ] && [ -e "$ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk" ]; then
+    $BB umount -l "$ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk" 2>/dev/null || true
+    $BB mount --bind "$STAGE/SystemUI_patched.apk" "$ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk"
+    echo "Bound SystemUI_patched.apk -> $ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk"
+fi
 # Play services and the Play Store from One UI's copy (oneos_switch.sh took it
 # before One UI stopped), bound over the image's my_product slots, for every
 # ColorOS set (switcher/assets/guest_google.sh). Never stops the start: without
