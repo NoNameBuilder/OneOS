@@ -127,7 +127,13 @@ object CompatEvaluator {
                 "soc-snapdragon", Level.OK, "Snapdragon",
                 "${f.soc.display}: the display path OneOS knows.",
             )
-            SocVendor.EXYNOS -> out += Finding(
+            // 0.4.17: an Exynos phone with its own profile (Galaxy S26+ Exynos, Z
+            // Flip7) is a first run, not a block; any other stays blocked.
+            SocVendor.EXYNOS -> out += if (profile != null) Finding(
+                "soc-exynos", Level.WARN, "Exynos: first runs",
+                "${f.soc.display}. OneOS has only run on Snapdragon so far; the ${profile.label} profile " +
+                    "is for its first sessions.",
+            ) else Finding(
                 "soc-exynos", Level.BLOCK, "Exynos is not supported yet",
                 "${f.soc.display}. Only the Snapdragon display path is known; Exynos stays " +
                     "blocked until an Exynos profile exists.",

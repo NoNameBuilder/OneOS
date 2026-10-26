@@ -191,6 +191,8 @@ class ImagesTest {
             Profiles.S_ULTRA_8650 to listOf(xin, x9u),
             Profiles.S_8550 to listOf(xin, x9u),
             Profiles.S_PLUS_8850 to listOf(xin, x9u, Images.PIXEL_KODIAK),
+            Profiles.S_PLUS_9965 to listOf(xin, x9u, Images.PIXEL_KODIAK),
+            Profiles.FLIP7 to listOf(xin, x9u),
         )
         for ((p, good) in takes) {
             assertEquals(p.id, good, p.images())

@@ -38,12 +38,15 @@ val packageSets: Map<String, Pair<File, List<String>>> = linkedMapOf(
     "x9u-sultra" to (File(repoRoot, "out/overlays_x9u_r50") to listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk")),
     // Find X9 Ultra IN image (0.3.3-0.3.6, again from 0.4.11), the bar phones:
     // the CN set's files (shared by hash) and its cell broadcast module.
-    "x9u-in-sultra" to (File(repoRoot, "out/overlays_x9u_in_r50") to listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk")),
+    "x9u-in-sultra" to (File(repoRoot, "out/overlays_x9u_in_r51") to listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk")),
     // Pixel 11 Fold image (0.3.7), Z Fold (F8U): everything a Pixel session uses,
     // OneOSGuest.apk included.
     "pixel-f8u" to (File(repoRoot, "out/overlays_pixel_yogi") to listOf("tethering_payload.img")),
     // Pixel 11 Pro image (0.4.10), Galaxy S26 Ultra: the same files from that image.
     "pixel-sultra" to (File(repoRoot, "out/overlays_pixel_kodiak") to listOf("tethering_payload.img")),
+    // Find N6 image, Galaxy Z Fold8 (0.4.14, pull request #1): the Fold's set and the Fold8 fixes
+    // scripts/make-fold8-coloros.py builds from it.
+    "n6-f8" to (File(repoRoot, "out/overlays_n6_fold8") to listOf("tethering_payload.img")),
 )
 // Session scripts copied from switcher/assets at build time (plus the expected
 // installd table). oneos_tunnel.sh (the server tunnel) and 7zz are never shipped.
@@ -55,6 +58,8 @@ val sessionScripts: Map<String, File> = linkedMapOf(
     "return_to_oneui.sh" to File(repoRoot, "switcher/assets/return_to_oneui.sh"),
     "check_host_apex.sh" to File(repoRoot, "switcher/assets/check_host_apex.sh"),
     "bridges.sh" to File(repoRoot, "switcher/assets/bridges.sh"),
+    "fold8_coloros.sh" to File(repoRoot, "switcher/assets/fold8_coloros.sh"),
+    "guest_google.sh" to File(repoRoot, "switcher/assets/guest_google.sh"),
     "zygote_exec" to File(repoRoot, "switcher/assets/zygote_exec"),
     "host_installd.txt" to File(repoRoot, "switcher/patches/host_installd.txt"),
 )
@@ -220,8 +225,8 @@ android {
         // 0.3.4: the Galaxy S25 profile, and OneOS Probe as its own app (flavor probe).
         // 0.3.5: Old stages (delete the stages Prepare moved aside).
         // 0.3.7: the Pixel 11 Fold image and its set on the Fold; the Find X9 Ultra IN image is gone.
-        versionCode = 26
-        versionName = "0.4.13"
+        versionCode = 32
+        versionName = "0.4.19"
     }
 
     // One codebase, two apps (docs/app/DESIGN.md, 0.3.4): "full" is OneOS, the app

@@ -317,7 +317,9 @@ object PrepareJob : BackgroundJob<PrepareJob.State>(State(), "oneos-prepare") {
             val imageBase = base
             val feed = ImageFeed(app, uri, image) { gz ->
                 bytes(imageBase, gz)
-                detail("${Units.bytes(gz * image.rawBytes / image.gzBytes)} of ${Units.bytes(image.rawBytes)}")
+                // In Double: gz * rawBytes passes Long's range after about 1.2 GB of
+                // a large image's .gz, and the label showed wrong sizes and "?" (2026-10-25).
+                detail("${Units.bytes((gz.toDouble() / image.gzBytes * image.rawBytes).toLong())} of ${Units.bytes(image.rawBytes)}")
             }
             verb(
                 app, Step.IMAGE, RootScript.Verb.RECEIVE, listOf(RootScript.RAW_NAME, image.rawBytes.toString(), image.rawSha256), feed,

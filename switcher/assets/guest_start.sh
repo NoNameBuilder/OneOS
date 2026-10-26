@@ -196,8 +196,15 @@ fi
 # every frame from the guest's came back NO_RESOURCES on both displays and the
 # panel kept showing One UI's last frame. Restart it so the guest gets a fresh
 # client.
-echo "[Pivoted Root] Restarting the vendor display composer..."
-setprop ctl.restart vendor.qti.hardware.display.composer
+# Snapdragon's composer service is vendor.qti.hardware.display.composer,
+# Samsung's Exynos one vendor.hwcomposer-3 (Galaxy S26+ Exynos and Z Flip7
+# probes, 2026-10-25).
+COMPOSER_SVC=""
+for c in vendor.qti.hardware.display.composer vendor.hwcomposer-3; do
+    [ -n "$(getprop init.svc.$c)" ] && { COMPOSER_SVC=$c; break; }
+done
+echo "[Pivoted Root] Restarting the vendor display composer (${COMPOSER_SVC:-none found})..."
+[ -z "$COMPOSER_SVC" ] || setprop ctl.restart "$COMPOSER_SVC"
 # With the gap splash, the black that is left is from here to the first boot
 # animation frame, and most of it was fixed sleeps. Run 33 (all.log): the
 # splash's surfaceflinger died 14:41:22.70, the new composer had registered
@@ -453,8 +460,10 @@ sleep 1
 # brightness until the guest's system_server does, so the boot animation can
 # play on a dark panel. Log both Fold panels and keep the inner one
 # (panel0-backlight) lit for the first 3 minutes if it sits at 0.
-BL=/sys/class/backlight/panel0-backlight
-echo "[Pivoted Root] Backlight: inner=$(cat $BL/brightness 2>/dev/null) cover=$(cat /sys/class/backlight/panel1-backlight/brightness 2>/dev/null)"
+# Snapdragon: panel0-backlight and panel1-backlight; Exynos: panel and panel1.
+BL=/sys/class/backlight/panel0-backlight; BL2=/sys/class/backlight/panel1-backlight
+[ -d "$BL" ] || { BL=/sys/class/backlight/panel; BL2=/sys/class/backlight/panel1; }
+echo "[Pivoted Root] Backlight: inner=$(cat $BL/brightness 2>/dev/null) cover=$(cat $BL2/brightness 2>/dev/null)"
 if [ -w "$BL/brightness" ]; then
     $BB sh -c "
         i=0

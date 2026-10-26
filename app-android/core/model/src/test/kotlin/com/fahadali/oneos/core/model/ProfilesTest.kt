@@ -89,14 +89,16 @@ class ProfilesTest {
         assertEquals(listOf("f8", "Galaxy Z Fold8"), listOf(fold8.id, fold8.label))
         assertEquals(listOf("SM-F971", "h8q", "SM8850"), listOf(fold8.modelPrefix, fold8.codename, fold8.socModel))
         assertEquals(FormFactor.FOLD, fold8.form)
+        // 0.4.14 (pull request #1): the Find N6 image with its own set n6-f8, run on the friend's SM-F971B.
         assertEquals(
             listOf(
-                ImageChoice(Images.ID_FIND_N6, PackageSets.ID_N6_F8U, tested = false),
+                ImageChoice(Images.ID_FIND_N6, PackageSets.ID_N6_F8, tested = true),
                 ImageChoice(Images.ID_PIXEL_YOGI, PackageSets.ID_PIXEL_F8U, tested = false),
             ),
             fold8.choices,
         )
-        assertTrue(fold8.notes.isEmpty() && !fold8.testedWithAnyImage)
+        assertTrue(fold8.notes.isEmpty() && fold8.testedWithAnyImage)
+        assertEquals(Images.ID_FIND_N6, fold8.recommended?.imageId)
         // Galaxy S26 (0.4.11): the S Ultra's images and sets, untested; one profile per model number.
         val s26Base = Profiles.S_8850
         assertEquals(listOf("s-8850", "Galaxy S26"), listOf(s26Base.id, s26Base.label))
@@ -129,6 +131,23 @@ class ProfilesTest {
         assertEquals(FormFactor.BAR, s26Plus.form)
         assertEquals(s26Base.choices, s26Plus.choices)
         assertTrue(s26Plus.notes.isEmpty() && !s26Plus.testedWithAnyImage)
+        // The Exynos Galaxy S26+ and Z Flip7 (0.4.17): their own codenames and chips, untested, the Exynos note;
+        // the S26+ takes the S26's images (SVE for Pixel), the Flip7 the Find X9 Ultra builds as a phone.
+        val s26PlusExynos = Profiles.S_PLUS_9965
+        assertEquals(listOf("s-plus-9965", "Galaxy S26+ (Exynos)"), listOf(s26PlusExynos.id, s26PlusExynos.label))
+        assertEquals(listOf("SM-S947", "m2s", "s5e9965"), listOf(s26PlusExynos.modelPrefix, s26PlusExynos.codename, s26PlusExynos.socModel))
+        assertEquals(FormFactor.BAR, s26PlusExynos.form)
+        assertEquals(s26Base.choices, s26PlusExynos.choices)
+        val flip7 = Profiles.FLIP7
+        assertEquals(listOf("flip7", "Galaxy Z Flip7"), listOf(flip7.id, flip7.label))
+        assertEquals(listOf("SM-F766", "b7s", "s5e9955"), listOf(flip7.modelPrefix, flip7.codename, flip7.socModel))
+        assertEquals(FormFactor.FLIP, flip7.form)
+        assertEquals(listOf(xin, ImageChoice(Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, tested = false)), flip7.choices)
+        for (p in listOf(s26PlusExynos, flip7)) {
+            assertEquals(listOf(Profiles.ID_NOTE_EXYNOS), p.notes.map { it.id })
+            assertEquals(Level.WARN, p.notes.single().level)
+            assertFalse(p.testedWithAnyImage)
+        }
         // Galaxy S23 and S23+ (0.4.11): the X9U image, untested, with the will-most-likely-not-start note.
         val s23 = Profiles.S_8550
         val s23Plus = Profiles.S_PLUS_8550
@@ -146,6 +165,7 @@ class ProfilesTest {
             listOf(
                 Profiles.F8U, Profiles.S_ULTRA_8850, Profiles.S_ULTRA_8750, Profiles.S_8750, Profiles.FOLD7, Profiles.S_PLUS_8750, Profiles.FOLD8,
                 Profiles.S_8850, Profiles.S_8850_JP, Profiles.S_ULTRA_8650, Profiles.S_8550, Profiles.S_PLUS_8550, Profiles.S_PLUS_8850,
+                Profiles.S_PLUS_9965, Profiles.FLIP7,
             ),
             Profiles.BUILT_IN,
         )
@@ -174,11 +194,15 @@ class ProfilesTest {
         // The owner does not want the X9U (CN) image on the Fold: only the N6 and Pixel images there.
         // The Fold7 (0.4.8) takes the N6 image only.
         assertEquals(listOf(Profiles.F8U, Profiles.FOLD7, Profiles.FOLD8), Profiles.BUILT_IN.filter { it.form == FormFactor.FOLD })
-        assertTrue(Profiles.BUILT_IN.filter { it.choice(Images.ID_FIND_X9U) != null }.all { it.form == FormFactor.BAR })
+        // The Find X9 Ultra builds run as a phone: the bar phones and (0.4.17) the Z Flip7 on its main screen.
+        assertTrue(Profiles.BUILT_IN.filter { it.choice(Images.ID_FIND_X9U) != null }.all { it.form == FormFactor.BAR || it.form == FormFactor.FLIP })
+        assertEquals(listOf(Profiles.FLIP7), Profiles.BUILT_IN.filter { it.form == FormFactor.FLIP })
         // The Pixel 11 Fold image on the SM8850 folds (it ran on the Fold8 Ultra; 0.4.10 the Z Fold8, untested), with the Fold's set.
         assertEquals(listOf(Profiles.F8U, Profiles.FOLD8), Profiles.BUILT_IN.filter { it.choice(Images.ID_PIXEL_YOGI) != null })
-        // Pixel images on SM8850 phones only: Pixel's system code needs SVE, which the older chips lack.
-        assertTrue(Profiles.BUILT_IN.filter { it.socModel != "SM8850" }.all { p -> p.images().none { it.family == SystemFamily.PIXEL } })
+        // Pixel images only on chips with SVE, which Pixel's system code needs: SM8850, and (0.4.17) the
+        // Exynos 2600 of the S26+; not the older Snapdragons nor the Flip7's Exynos 2500 (no SME).
+        val sve = setOf("SM8850", "s5e9965")
+        assertTrue(Profiles.BUILT_IN.filter { it.socModel !in sve }.all { p -> p.images().none { it.family == SystemFamily.PIXEL } })
         assertEquals(PackageSets.ID_PIXEL_F8U, Profiles.F8U.choice(Images.ID_PIXEL_YOGI)!!.packageSetId)
         // 0.4.11: every bar phone that takes the CN build takes the IN build too, listed first; never a fold.
         assertEquals(
@@ -217,7 +241,13 @@ class ProfilesTest {
         // Galaxy S26+ (0.4.12): SM-S947, m2q, SM8850.
         assertEquals(Profiles.S_PLUS_8850, profile("SM-S947U", "m2q", "SM8850"))
         assertEquals(Profiles.S_PLUS_8850, profile("SM-S947B", "m2q", "SM8850"))
-        assertNull(profile("SM-S947B", "m2q", "s5e9965")) // an Exynos S26+
+        assertNull(profile("SM-S947B", "m2q", "s5e9965")) // Exynos chip, Snapdragon codename
+        // The Exynos S26+ and Z Flip7 (0.4.17).
+        assertEquals(Profiles.S_PLUS_9965, profile("SM-S947B", "m2s", "s5e9965"))
+        assertNull(profile("SM-S947B", "m2s", "SM8850"))
+        assertEquals(Profiles.FLIP7, profile("SM-F766U", "b7s", "s5e9955"))
+        assertEquals(Profiles.FLIP7, profile("SM-F766B", "B7S", "S5E9955"))
+        assertNull(profile("SM-F766U", "b7s", "s5e9965"))
         assertNull(profile("SM-S947U", "m3q", "SM8850")) // S26+ model number, S26 Ultra codename
         // Galaxy S23 and S23+ (0.4.11).
         assertEquals(Profiles.S_8550, profile("SM-S911B", "dm1q", "SM8550"))

@@ -131,7 +131,7 @@ class PlainTest {
         assertEquals(FixAction.FREE_UP_SPACE, space.action)
         // The phone list comes from the profiles.
         assertEquals(
-            "OneOS works on the Galaxy Z Fold (F8U), S26 Ultra, S25 Ultra, S25, Z Fold7, S25+, Z Fold8, S26, S24 Ultra, S23, S23+ and S26+.",
+            "OneOS works on the Galaxy Z Fold (F8U), S26 Ultra, S25 Ultra, S25, Z Fold7, S25+, Z Fold8, S26, S24 Ultra, S23, S23+, S26+ and Z Flip7.",
             of(SwitchGates.ID_PROFILE, SwitchGates.R_PROFILE_NONE).line,
         )
         // Ticks: the same text as the gate's (part of the tick's key).

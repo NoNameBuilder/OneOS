@@ -91,6 +91,8 @@ object Profiles {
     const val ID_S_ULTRA_8650 = "s-ultra-8650"
     const val ID_S_8550 = "s-8550"
     const val ID_S_PLUS_8550 = "s-plus-8550"
+    const val ID_S_PLUS_9965 = "s-plus-9965"
+    const val ID_FLIP7 = "flip7"
 
     /** The SM8750 and SM8650 phones' note ([PhoneProfile.notes]) and its [Finding.reason]. */
     const val ID_NOTE_OLDER_VENDOR = "profile-vendor-older"
@@ -144,6 +146,24 @@ object Profiles {
             "vendor API 202404 and newer. If the screen stays black, OneOS returns to One UI by itself; " +
             "share the session logs afterwards.",
         R_EXPECT_NO_START,
+    )
+
+    /** The Exynos phones' note: the first sessions on that chip. */
+    const val ID_NOTE_EXYNOS = "profile-exynos"
+    const val R_EXYNOS = "exynos"
+
+    /**
+     * 0.4.17: the first Exynos phones. The guest system takes One UI's vendor
+     * through Android's standard interfaces, the same as on Snapdragon, and the
+     * session scripts find Samsung's Exynos display composer
+     * (vendor.hwcomposer-3) and backlight (/sys/class/backlight/panel)
+     * themselves; nothing has run on Exynos yet.
+     */
+    private val EXYNOS = Finding(
+        ID_NOTE_EXYNOS, Level.WARN, "First runs on Exynos",
+        "OneOS has only run on Snapdragon phones so far. The screen, phone calls, Wi-Fi or sound may not work; " +
+            "if the screen stays black, OneOS returns to One UI by itself. Share the session logs afterwards.",
+        R_EXYNOS,
     )
 
     /** The Switch tick for [ID_NOTE_EXPECT_NO_START]. */
@@ -269,8 +289,10 @@ object Profiles {
         codename = "h8q",
         socModel = "SM8850",
         form = FormFactor.FOLD,
+        // 0.4.14: the Find N6 image with its own set, n6-f8 (pull request #1; the
+        // owner's friend has run ColorOS on his SM-F971B, so it counts as tested).
         choices = listOf(
-            ImageChoice(Images.ID_FIND_N6, PackageSets.ID_N6_F8U, tested = false),
+            ImageChoice(Images.ID_FIND_N6, PackageSets.ID_N6_F8, tested = true),
             ImageChoice(Images.ID_PIXEL_YOGI, PackageSets.ID_PIXEL_F8U, tested = false),
         ),
     )
@@ -364,9 +386,53 @@ object Profiles {
         notes = listOf(EXPECT_NO_START),
     )
 
+    /**
+     * Galaxy S26+ with Exynos, from 0.4.17: a probe report of 2026-10-25
+     * (SM-S947B, m2s, s5e9965 Exynos 2600, One UI 9.0, Android 17 build
+     * CP2A.260605.016, one 1440 x 3120 panel on port 129 at density 600,
+     * sec_touchscreen, backlight /sys/class/backlight/panel, composer
+     * vendor.hwcomposer-3, SVE, SVE2, SME and SME2, installd table identical to
+     * switcher/patches/host_installd.txt). The Galaxy S26's images and sets
+     * (both Find X9 Ultra builds and the Pixel 11 Pro, whose system code needs
+     * the SVE this chip has), untested, with [EXYNOS].
+     */
+    val S_PLUS_9965 = PhoneProfile(
+        id = ID_S_PLUS_9965,
+        label = "Galaxy S26+ (Exynos)",
+        modelPrefix = "SM-S947",
+        codename = "m2s",
+        socModel = "s5e9965",
+        form = FormFactor.BAR,
+        choices = S_8850_CHOICES,
+        notes = listOf(EXYNOS),
+    )
+
+    /**
+     * Galaxy Z Flip7, from 0.4.17: a probe report of 2026-10-25 (SM-F766U, b7s,
+     * s5e9955 Exynos 2500, One UI 9.0, Android 17 build CP2A.260605.016, main
+     * panel 1080 x 2520 on port 129 at density 480 and a 948 x 1048 cover on
+     * 130, sec_touchscreen and sec_touchscreen2, a "flip" lid switch,
+     * backlights panel and panel1, composer vendor.hwcomposer-3, SVE and SVE2
+     * but no SME, installd table identical to host_installd.txt). It runs the
+     * guest as a phone on the main panel (the bar settings; no cover layout
+     * yet), with the Find X9 Ultra builds, untested, and [EXYNOS]. The ColorOS
+     * images also start on the SM8750 phones, which have no SME either.
+     */
+    val FLIP7 = PhoneProfile(
+        id = ID_FLIP7,
+        label = "Galaxy Z Flip7",
+        modelPrefix = "SM-F766",
+        codename = "b7s",
+        socModel = "s5e9955",
+        form = FormFactor.FLIP,
+        choices = listOf(X9U_IN_CHOICE, ImageChoice(Images.ID_FIND_X9U, PackageSets.ID_X9U_SULTRA, tested = false)),
+        notes = listOf(EXYNOS),
+    )
+
     val BUILT_IN: List<PhoneProfile> = listOf(
         F8U, S_ULTRA_8850, S_ULTRA_8750, S_8750, FOLD7, S_PLUS_8750, FOLD8,
         S_8850, S_8850_JP, S_ULTRA_8650, S_8550, S_PLUS_8550, S_PLUS_8850,
+        S_PLUS_9965, FLIP7,
     )
 
     /** `ro.build.version.oneui` values seen on profiled phones (all One UI 9.0). */

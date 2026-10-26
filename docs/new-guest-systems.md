@@ -11,6 +11,16 @@ what has to be pinned per build, and what depends on the OS family.
   own files and skip when those are missing. The one split is ColorOS
   (`oplus-services.jar` present, `GUEST_OPLUS=1`) against an AOSP-style
   framework (`GUEST_OPLUS=0`, Pixel's path).
+- **Image layout.** guest_prepare.sh runs in One UI's mount namespace, so
+  an absolute link inside the image points at One UI's own files. It finds
+  the guest's real `system_ext` and `product` folders in either layout
+  (`system/product` as the folder with `/product` as a link, or the other
+  way round). Before and after its setup it lists the mount points on One
+  UI's partitions, and refuses to start the guest if one was added.
+  return_to_oneui.sh checks the same before an in-place return. One image
+  had `system/product` as the link, and the guest's display config, product
+  seapp_contexts and a permissions file landed on One UI's `/product` until
+  0.4.16.
 - **Safety patches on services.jar** (`scripts/make-overlays.sh`): storage,
   installd ABI proxy, power and BCB, sysrq, vold keys, weaver, biometric,
   gatekeeper, FRP, apexd, app ids from 15000, no new users. Each patcher reads

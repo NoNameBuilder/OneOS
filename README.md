@@ -38,8 +38,9 @@ WeWaffles, and builds its guest images with
 
 ## Status
 
-App version 0.4.7. Snapdragon Samsung flagships only; root is required
-(tested with KernelSU; Magisk and APatch are detected but untested).
+App version 0.4.17. Samsung flagships with Snapdragon, plus the first two
+Exynos phones; root is required (tested with KernelSU; Magisk and APatch are
+detected but untested).
 
 | Guest system | Tested on |
 | --- | --- |
@@ -57,6 +58,11 @@ S23+ (SM-S916) are accepted for testing only:
 their vendor software is too old and the system will most likely not start
 (One UI comes back by itself; please share the session logs).
 
+Exynos, first runs: the Galaxy S26+ with Exynos (SM-S947B, m2s) with both
+Find X9 Ultra builds and the Pixel 11 Pro image, and the Galaxy Z Flip7
+(SM-F766, Exynos 2500) with both Find X9 Ultra builds, used as a phone on the
+main screen (no cover screen layout yet). Nothing has run on Exynos yet.
+
 Pixel 11 Fold on the Galaxy Z Fold8 Ultra: calls and SMS on both SIMs, 5G and
 Wi-Fi, Bluetooth audio, Google Play and Google's apps, the inner and cover
 screens, blur, and Back to One UI (usually without a restart).
@@ -64,8 +70,8 @@ screens, blur, and Back to One UI (usually without a restart).
 Known open issues for each system are in `docs/pixel-guest.md` and
 `docs/coloros-on-fold.md`.
 
-Everything else (Exynos phones, other models, other images, other Android
-versions) is refused by the app's compatibility checks.
+Everything else (other Exynos phones, other models, other images, other
+Android versions) is refused by the app's compatibility checks.
 
 ## Your phone is not listed?
 

@@ -21,7 +21,7 @@ class CompatEvaluatorTest {
         assertEquals("Has run on the Z Fold (F8U): ColorOS 17 · Find N6 build; Pixel 11 Fold.", r.find("tested-model")!!.detail)
         assertEquals("Has run on: ColorOS 17 · Find N6 build on the Z Fold (F8U); Pixel 11 Fold on the Z Fold (F8U); " +
             "ColorOS 17 · Find X9 Ultra build on the Galaxy S26 Ultra; ColorOS 17 · Find X9 Ultra build on the Galaxy S25 Ultra; " +
-            "ColorOS 17 · Find X9 Ultra build on the Galaxy S25.",
+            "ColorOS 17 · Find X9 Ultra build on the Galaxy S25; ColorOS 17 · Find N6 build on the Galaxy Z Fold8.",
             CompatEvaluator.TESTED_SCOPE,
         )
         assertEquals(Level.OK, r.level("soc-snapdragon"))
@@ -101,14 +101,27 @@ class CompatEvaluatorTest {
 
     @Test
     fun exynosIsBlocked() {
+        // An Exynos S26 Ultra: no profile, so Exynos stays a block.
         val r = eval(
             Fixtures.facts(
-                model = "SM-F766B", device = "b7s",
-                soc = SocProps(manufacturer = "Samsung", model = "s5e9955", platform = "s5e9955"),
+                model = "SM-S948B", device = "m3s",
+                soc = SocProps(manufacturer = "Samsung", model = "s5e9965", platform = "s5e9965"),
             ),
         )
         assertEquals(Verdict.NOT_SUPPORTED, r.verdict)
         assertEquals(Level.BLOCK, r.level("soc-exynos"))
+    }
+
+    /** 0.4.17: an Exynos phone with its own profile (the Z Flip7) gets a first-runs warning, not the block. */
+    @Test
+    fun exynosWithAProfileIsAFirstRun() {
+        val r = eval(
+            Fixtures.facts(
+                model = "SM-F766U", device = "b7s",
+                soc = SocProps(manufacturer = "Samsung", model = "s5e9955", platform = "s5e9955"),
+            ),
+        )
+        assertEquals(Level.WARN, r.level("soc-exynos"))
     }
 
     @Test

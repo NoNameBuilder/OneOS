@@ -114,8 +114,9 @@ class StageAuditTest {
         assertEquals(RootScript.SCRIPTS, shVar("SCRIPTS").split(' '))
         assertEquals(SessionEnv.ALLOWED.keys.toList(), shVar("ENV_KEYS").split(' '))
         assertEquals(Images.ALL.map { it.sdk }.distinct().single().toString(), shVar("IMAGE_SDK"))
-        // Enabled profiles only, each with its ids and form (SM- model numbers, and docomo's SC- ones).
-        val rows = Regex("""^\s+([a-z0-9-]+)\) echo "(S[MC]-\S+) (\S+) (\S+) (fold|bar)" ;;$""", RegexOption.MULTILINE)
+        // Enabled profiles only, each with its ids and form (SM- model numbers, and docomo's SC- ones;
+        // 0.4.17: the Z Flip7's flip, which root runs with the phone settings).
+        val rows = Regex("""^\s+([a-z0-9-]+)\) echo "(S[MC]-\S+) (\S+) (\S+) (fold|bar|flip)" ;;$""", RegexOption.MULTILINE)
             .findAll(script).associate { it.groupValues[1] to it.groupValues.drop(2) }
         val enabled = Profiles.BUILT_IN.filter { it.enabled }
         assertEquals(enabled.map { it.id }.toSet(), rows.keys)
@@ -208,12 +209,13 @@ class StageAuditTest {
 
     /**
      * The guards a set with GmsCore must name in guards.txt's comments (PackageSet.checkGuards) are the ones
-     * oneos_switch.sh's preflight and guest_prepare.sh require before they present Google services.
+     * oneos_switch.sh's preflight and guest_prepare.sh require before they present Google services, and
+     * guest_google.sh before it copies One UI's Play services for a ColorOS guest.
      */
     @Test
     fun gmsGuardsAreTheSessionScriptsOnes() {
         val loop = Regex("""for t in ([a-z0-9 ]+); do\n\s+grep '\^#' "\${'$'}STAGE/guards\.txt"""")
-        for (n in listOf("oneos_switch.sh", "guest_prepare.sh")) {
+        for (n in listOf("oneos_switch.sh", "guest_prepare.sh", "guest_google.sh")) {
             val found = loop.findAll(File(Shipped.switcherAssets, n).readText()).map { it.groupValues[1].trim().split(' ') }.toList()
             assertEquals(n, listOf(PackageSets.GMS_GUARDS), found)
         }

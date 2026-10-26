@@ -352,6 +352,10 @@ class StageScriptTest {
         val keep = oldStage(fr, "oneos.old-1792000000")
         val gone = oldStage(fr, "oneos.old-1792000100-12")
         File(gone, "persist_session.active").writeText("format=2\nboot_id=99999999-0000-0000-0000-000000000000\n")
+        // 0.4.13: a session earlier in this boot that returned in place leaves the return watcher's
+        // record; that alone does not keep it (nothing mounted, no loop device, nothing bridged).
+        File(gone, "return_keys").mkdirs()
+        File(gone, "return_keys/boot").writeText("11111111-2222-3333-4444-555555555555\n")
         // A link inside points at the active stage: deleting must not follow it.
         java.nio.file.Files.createSymbolicLink(File(gone, "data/stage_link").toPath(), fr.stage.toPath())
         val stageBefore = FakeRoot.exec(listOf("find", fr.stage.path, "-printf", "%P %y %s\\n")).lines().sorted()
@@ -778,7 +782,7 @@ class StageScriptTest {
         refused(fr.run(RootScript.Verb.BEGIN, "keep", "s-plus-8750", Images.ID_FIND_N6, PackageSets.ID_N6_F8U, "4"), "does not run coloros17-findn6")
     }
 
-    /** 0.4.10: the Galaxy Z Fold8 (SM-F971, h8q, SM8850) takes the Fold's two images with their sets, and only on itself. */
+    /** 0.4.10: the Galaxy Z Fold8 (SM-F971, h8q, SM8850) takes the Fold's two images, the Find N6 one with its own set (0.4.14), and only on itself. */
     @Test
     fun galaxyZFold8TakesTheFoldSets() = eachShell { fr ->
         fr.props["ro.product.model"] = "SM-F971B"
@@ -786,9 +790,12 @@ class StageScriptTest {
         fr.props["ro.soc.model"] = "SM8850"
         fr.writeProps()
         val n6 = Stager(fr, Profiles.FOLD8)
-        assertEquals(PackageSets.N6_F8U, n6.set)
+        // 0.4.14 (pull request #1): the Find N6 image with its own set, n6-f8.
+        assertEquals(PackageSets.N6_F8, n6.set)
         n6.prepare()
-        assertEquals("f8", StageMarker.parse(File(fr.stage, StageMarker.FILE_NAME).readText())!!.profileId)
+        val marker = StageMarker.parse(File(fr.stage, StageMarker.FILE_NAME).readText())!!
+        assertEquals(listOf("f8", PackageSets.ID_N6_F8), listOf(marker.profileId, marker.setId))
+        for (name in PackageSets.N6_F8.names) assertTrue(name, File(fr.stage, name).isFile)
         refused(n6.launch(), "test root: every launch check passed")
         val pixel = Stager(fr, Profiles.FOLD8, Images.ID_PIXEL_YOGI)
         assertEquals(PackageSets.PIXEL_F8U, pixel.set)
@@ -813,6 +820,9 @@ class StageScriptTest {
             Profiles.S_8550 to "SM-S911B",
             Profiles.S_PLUS_8550 to "SM-S916U",
             Profiles.S_PLUS_8850 to "SM-S947U",
+            // 0.4.17: the Exynos S26+ and Z Flip7 (root compares ro.soc.model as Android reports it).
+            Profiles.S_PLUS_9965 to "SM-S947B",
+            Profiles.FLIP7 to "SM-F766U",
         )) {
             eachShell { fr ->
                 fr.props["ro.product.model"] = model
@@ -822,7 +832,7 @@ class StageScriptTest {
                 val s = Stager(fr, p)
                 assertEquals(p.id, PackageSets.X9U_SULTRA, s.set)
                 assertEquals(p.id, PackageSets.X9U_IN_SULTRA, Stager(fr, p, Images.ID_FIND_X9U_IN).set)
-                if (p.socModel == "SM8850") {
+                if (p.choice(Images.ID_PIXEL_KODIAK) != null) {
                     assertEquals(p.id, PackageSets.PIXEL_SULTRA, Stager(fr, p, Images.ID_PIXEL_KODIAK).set)
                 } else {
                     refused(fr.run(RootScript.Verb.BEGIN, "keep", p.id, Images.ID_PIXEL_KODIAK, PackageSets.ID_PIXEL_SULTRA, "4"), "does not run pixel11pro-kodiak")

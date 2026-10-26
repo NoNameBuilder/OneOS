@@ -103,7 +103,7 @@ IMAGE_SDK=37
 # installd codes the guard jars carry (InstalldExpected.SHA256).
 INSTALLD_SHA=791e52c441b62944f88244a2610b9433c869c9c3916a49f43d14552de82280f2
 # Session scripts from switcher/assets plus the expected installd table.
-SCRIPTS="oneos_switch.sh guest_prepare.sh guest_start.sh guest_props.sh return_to_oneui.sh check_host_apex.sh bridges.sh zygote_exec host_installd.txt"
+SCRIPTS="oneos_switch.sh guest_prepare.sh guest_start.sh guest_props.sh return_to_oneui.sh check_host_apex.sh bridges.sh fold8_coloros.sh guest_google.sh zygote_exec host_installd.txt"
 SET_COMMON="services_patched.jar oplus-services_patched.jar vold_patched service.incremental_patched.so OneOSGuest.apk ims-ext-common_patched.jar oplus-telephony-common_patched.jar surfaceflinger_patched guards.txt art_payload.img i18n_payload.img runtime_payload.img sdkext_payload.img crashrecovery_payload.img extservices_payload.img permission_payload.img wifi_payload.img appsearch_payload.img mediaprovider_payload.img adservices_payload.img rkpd_payload.img healthfitness_payload.img ondevicepersonalization_payload.img configinfrastructure_payload.img"
 # The Pixel sets (the Fold's 0.3.7, the S26 Ultra's 0.4.10): services.jar with the guest vold as gvld, the signal
 # poll, Pixel's status bar RRO, the in-guest OneOS app and its own payloads.
@@ -119,7 +119,8 @@ IMAGES_GMS="coloros17-findx9u-in"
 
 # <id>: <model prefix> <codename> <SoC> <form>. Enabled profiles only (the
 # S25 Ultra from 0.3.1, the Galaxy S25 from 0.3.4, the Z Fold7 from 0.4.8,
-# the Galaxy S25+ and the Z Fold8 from 0.4.10).
+# the Galaxy S25+ and the Z Fold8 from 0.4.10, the Exynos Galaxy S26+ and Z
+# Flip7 from 0.4.17). A flip gets the phone settings (env_value: not fold).
 profile_info() {
     case "$1" in
         f8u) echo "SM-F976 q8q SM8850 fold" ;;
@@ -135,6 +136,8 @@ profile_info() {
         s-8550) echo "SM-S911 dm1q SM8550 bar" ;;
         s-plus-8550) echo "SM-S916 dm2q SM8550 bar" ;;
         s-plus-8850) echo "SM-S947 m2q SM8850 bar" ;;
+        s-plus-9965) echo "SM-S947 m2s s5e9965 bar" ;;
+        flip7) echo "SM-F766 b7s s5e9955 flip" ;;
         *) return 1 ;;
     esac
 }
@@ -156,7 +159,7 @@ profile_set() {
         "f7 coloros17-findn6") echo n6-f8u ;;
         "s-plus-8750 coloros17-findx9u-in") echo x9u-in-sultra ;;
         "s-plus-8750 coloros17-findx9u") echo x9u-sultra ;;
-        "f8 coloros17-findn6") echo n6-f8u ;;
+        "f8 coloros17-findn6") echo n6-f8 ;;
         "f8 pixel11fold-yogi") echo pixel-f8u ;;
         "s-8850 coloros17-findx9u-in") echo x9u-in-sultra ;;
         "s-8850 coloros17-findx9u") echo x9u-sultra ;;
@@ -173,6 +176,11 @@ profile_set() {
         "s-plus-8850 coloros17-findx9u-in") echo x9u-in-sultra ;;
         "s-plus-8850 coloros17-findx9u") echo x9u-sultra ;;
         "s-plus-8850 pixel11pro-kodiak") echo pixel-sultra ;;
+        "s-plus-9965 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "s-plus-9965 coloros17-findx9u") echo x9u-sultra ;;
+        "s-plus-9965 pixel11pro-kodiak") echo pixel-sultra ;;
+        "flip7 coloros17-findx9u-in") echo x9u-in-sultra ;;
+        "flip7 coloros17-findx9u") echo x9u-sultra ;;
         *) return 1 ;;
     esac
 }
@@ -197,6 +205,7 @@ image_raw() {
 set_files() {
     case "$1" in
         n6-f8u) echo "$SET_COMMON OneOSWallpapersFoldGrid.apk" ;;
+        n6-f8) echo "$SET_COMMON OneOSWallpapersFoldGrid.apk Fold8SystemUI.apk Fold8AngleRelay.dex Fold8Aod.apk Fold8UMS.apk Fold8Instant.apk" ;;
         x9u-sultra) echo "$SET_COMMON" ;;
         x9u-in-sultra) echo "$SET_COMMON cellbroadcast_payload.img" ;;
         pixel-f8u) echo "$SET_PIXEL" ;;
@@ -208,7 +217,7 @@ set_files() {
 # <set>: the image it was built from (scripts/make-overlays.sh, PackageSet.imageId).
 set_image() {
     case "$1" in
-        n6-f8u) echo coloros17-findn6 ;;
+        n6-f8u|n6-f8) echo coloros17-findn6 ;;
         x9u-sultra) echo coloros17-findx9u ;;
         x9u-in-sultra) echo coloros17-findx9u-in ;;
         pixel-f8u) echo pixel11fold-yogi ;;
@@ -498,7 +507,7 @@ check_files() { # <names>
         [ -d "$f" ] && [ ! -L "$f" ] && continue
         n=${f##*/}
         case "$n" in
-            *_patched*|*_payload.img|*.apk|*.jar|*.so|*.sh|zygote_exec|clean_apex_info_list.xml|oneos-*)
+            *_patched*|*_payload.img|*.apk|*.jar|*.so|*.sh|Fold8AngleRelay.dex|zygote_exec|clean_apex_info_list.xml|oneos-*)
                 in_list "$n" "$1" || refuse "$n is in the stage but was not prepared (left from an older stage)" ;;
         esac
     done
@@ -716,7 +725,7 @@ do_finish() {
         n=${f##*/}
         in_list "$n" "$P_FILES system.raw system.raw.id files.sha256 session.env host_installd.table" && continue
         case "$n" in
-            *.log|persist_props.snapshot|persist_session.active|guest_locale|guest_props.added|guest_props.overridden|guest_props.boot|\
+            *.log|persist_props.snapshot|persist_session.active|guest_locale|guest_props.added|guest_props.overridden|guest_props.boot|guest_props.blanked|guest_props.blanked.boot|\
             host_wifi_on|host_adb_on|host_mobile_data|host_supplicant_svc|host_apex.before|host_apex.after|guest_mntns|guest_rootdev) continue ;;
         esac
         to_attic "$n"
@@ -907,10 +916,14 @@ backed_by_files_in() {
 }
 # 1 when the stage at $1 records a session of this boot (still running, or a
 # phone that was never restarted since).
+# A session of this boot that is still running (guest_props.boot) or never
+# returned (persist_session.active). 0.4.13: not return_keys/boot, the return
+# watcher's record, which stays after a clean in-place return and kept every
+# copy from such a session undeletable until a restart.
 session_this_boot() {
     now=$(boot_id)
     [ -n "$now" ] || return 0
-    for f in "$1/persist_session.active" "$1/guest_props.boot" "$1/return_keys/boot"; do
+    for f in "$1/persist_session.active" "$1/guest_props.boot"; do
         [ -f "$f" ] && grep -q -F "$now" "$f" 2>/dev/null && return 0
     done
     return 1

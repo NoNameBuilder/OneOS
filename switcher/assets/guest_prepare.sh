@@ -23,6 +23,17 @@ if awk -v p="$STAGE/data" '$5 == p || index($5, p "/") == 1' /proc/self/mountinf
     awk -v p="$STAGE/data" '$5 == p || index($5, p "/") == 1 {print "  " $5}' /proc/self/mountinfo
     exit 4
 fi
+# One UI's own partitions as mounted now (mount points), compared after the
+# setup below: nothing of the guest may land on them. In an image with
+# system/product as an absolute link to /product, binds made through the
+# rootfs's system/product in this (host) namespace went onto One UI's own
+# /product (Z Fold8 Ultra, 2026-10-25): its product_seapp_contexts and
+# split-permissions-google.xml were the guest's for the session, and the
+# in-place return found them and rebooted.
+host_part_mounts() {
+    awk '$5 ~ /^\/(system|system_ext|product|vendor|vendor_dlkm|odm|odm_dlkm|oem|prism|optics|my_[a-z_]+)(\/|$)/ {print $5}' /proc/self/mountinfo | sort
+}
+host_part_mounts > "$STAGE/host_part_mounts.before"
 # Nor may a host /data tree still be bridged from a session that never
 # returned: refuse, and let the return (reboot) clean up.
 [ -r "$STAGE/bridges.sh" ] || { echo "ERROR: $STAGE/bridges.sh missing"; exit 4; }
@@ -62,7 +73,7 @@ for s in data misc misc/adb misc/profiles misc/user misc/bluedroid misc/bluetoot
          misc_ce/0 misc_de/0 system system/devicestate system/package_cache \
          system/watchdog_timestamps system_de system_ce user/0 user_de/0 \
          oneos_bin oneos_bin/busybox zygote_exec oplus oplus/multimedia \
-         preapps-lib media/0 anr app local/tmp resource-cache; do
+         preapps-lib media/0 anr app local/tmp resource-cache oneos_fold8; do
     no_symlink "$s"
 done
 # The framework jars must be the ones built with the storage, installd and
@@ -134,9 +145,38 @@ rm -f "$STAGE/data/oneos_gms_present"
 rm -rf "$STAGE/data/system/package_cache" "$STAGE/data/system/watchdog_timestamps" 2>/dev/null
 
 echo "=== 1. Ensuring Watchdog Feeder is Active ==="
-if ! ps -ef | grep -v grep | grep -q "/dev/watchdog"; then
+# One UI's system_server opens /dev/watchdog (Samsung's softdog) unless
+# persist.vendor.softdog is off, sets 100 s and kicks it (services.jar
+# WatchdogSoftdog); stopped at [4b/6], it leaves the softdog running. The
+# Galaxy Z Flip7 (d5e743e6) and S26+ (80387c66), both Exynos, panicked
+# ("Software Watchdog Timer expired 100s") about 100 s after the guest's
+# system_server started. Each write is "V": a ping, and the magic close, so the
+# softdog stops on every close where the driver allows it, and stays stopped
+# if this loop ever ends. Every change between written and refused goes to
+# watchdog_feeder.log with the device's holders. A feeder of an older build
+# (echo -n 1) is replaced.
+pkill -f 'echo -n 1 > /dev/watchdog' 2>/dev/null
+if ! ps -ef | grep -v grep | grep -q "oneos_wdog_feeder.sh"; then
     echo "Starting watchdog feeder..."
-    nohup $BB sh -c "while true; do echo -n 1 > /dev/watchdog 2>/dev/null; sleep 2; done" </dev/null >/dev/null 2>&1 &
+    cat > "$STAGE/oneos_wdog_feeder.sh" <<'WDOG'
+L=/data/local/tmp/oneos/watchdog_feeder.log
+holders() {
+    for p in /proc/[0-9]*; do
+        ls -l "$p/fd" 2>/dev/null | grep -q '/dev/watchdog' && printf ' %s:%s' "${p#/proc/}" "$(cat "$p/comm" 2>/dev/null)"
+    done
+}
+was=''
+while true; do
+    if e=$(printf V 2>&1 > /dev/watchdog); then now=written; else now="refused ($e)"; fi
+    if [ "$now" != "$was" ]; then
+        echo "$(date +%T) /dev/watchdog $now; held by:$(holders)" >> "$L"
+        was=$now
+    fi
+    sleep 2
+done
+WDOG
+    chmod 700 "$STAGE/oneos_wdog_feeder.sh"
+    nohup $BB sh "$STAGE/oneos_wdog_feeder.sh" </dev/null >/dev/null 2>&1 &
 fi
 
 echo "=== 2. Creating Loop Device Nodes ==="
@@ -248,6 +288,18 @@ done
 # guest's tree does not have.
 GUEST_SYSTEM_EXT="$ROOTFS/system_ext"
 [ -L "$GUEST_SYSTEM_EXT" ] && GUEST_SYSTEM_EXT="$ROOTFS/system/system_ext"
+# product the same way, the other way round: ColorOS and Pixel images have
+# system/product and an absolute link /product -> /system/product; others
+# have /product and system/product -> /product, which in this namespace is One
+# UI's /product (see host_part_mounts at the top).
+GUEST_PRODUCT="$ROOTFS/system/product"
+[ -L "$GUEST_PRODUCT" ] && GUEST_PRODUCT="$ROOTFS/product"
+for d in "$GUEST_SYSTEM_EXT" "$GUEST_PRODUCT"; do
+    if [ -L "$d" ] || [ ! -d "$d" ]; then
+        echo "ERROR: ${d#$ROOTFS/} in the guest image is a link or missing (system_ext and product: one real folder each); not starting the guest"
+        exit 3
+    fi
+done
 # Signal bars in a guest without ColorOS's OplusSignalSmooth (run 43, Pixel):
 # Samsung's RIL sends the guest no signal strength indication and AOSP polls
 # only for opportunistic subscriptions, so both SIMs kept the all-invalid value
@@ -391,7 +443,7 @@ ddc_xml() {
 </displayConfiguration>
 DDCEOF
 }
-PETC="$ROOTFS/system/product/etc"
+PETC="$GUEST_PRODUCT/etc"
 if [ -e "$ROOTFS/system/framework/oplus-services.jar" ] || [ -L "$ROOTFS/system/framework/oplus-services.jar" ]; then
     :
 elif [ "${ONEOS_GUEST_DISPLAY_CONFIG:-1}" != 1 ]; then
@@ -503,10 +555,10 @@ fi
 # retried bindService 6 times a second for the whole session.
 # ONEOS_GUEST_IMS_EXT_BACKOFF=0 keeps ColorOS's jar.
 if [ "${ONEOS_GUEST_IMS_EXT_BACKOFF:-1}" = 1 ] && [ -f "$STAGE/ims-ext-common_patched.jar" ] \
-   && [ -f "$ROOTFS/system/product/framework/ims-ext-common.jar" ]; then
-    $BB umount -l "$ROOTFS/system/product/framework/ims-ext-common.jar" 2>/dev/null || true
-    $BB mount --bind "$STAGE/ims-ext-common_patched.jar" "$ROOTFS/system/product/framework/ims-ext-common.jar"
-    echo "Bound ims-ext-common_patched.jar -> $ROOTFS/system/product/framework/ims-ext-common.jar"
+   && [ -f "$GUEST_PRODUCT/framework/ims-ext-common.jar" ]; then
+    $BB umount -l "$GUEST_PRODUCT/framework/ims-ext-common.jar" 2>/dev/null || true
+    $BB mount --bind "$STAGE/ims-ext-common_patched.jar" "$GUEST_PRODUCT/framework/ims-ext-common.jar"
+    echo "Bound ims-ext-common_patched.jar -> $GUEST_PRODUCT/framework/ims-ext-common.jar"
 fi
 
 # Signal bars: OplusSignalSmooth polls GET_SIGNAL_STRENGTH every 20 s with the
@@ -520,6 +572,17 @@ if [ "${ONEOS_GUEST_SIGNAL_POLL:-1}" = 1 ] && [ -f "$STAGE/oplus-telephony-commo
     $BB mount --bind "$STAGE/oplus-telephony-common_patched.jar" "$GUEST_OTC"
     echo "Bound oplus-telephony-common_patched.jar -> $GUEST_OTC"
 fi
+# Play services and the Play Store from One UI's copy (oneos_switch.sh took it
+# before One UI stopped), bound over the image's my_product slots, for every
+# ColorOS set (switcher/assets/guest_google.sh). Never stops the start: without
+# a checked copy the guest starts without it.
+STAGE="$STAGE" BB="$BB" /system/bin/sh "$STAGE/guest_google.sh" prepare ||
+    echo "!!! guest_google.sh prepare failed; the guest starts without One UI's Play services"
+# Galaxy Z Fold8 with the Find N6 set (n6-f8): its SystemUI and guest fixes
+# (switcher/assets/fold8_coloros.sh). Does nothing for any other profile or set.
+# After the system_ext overlay above: a bind made under system_ext before it is
+# hidden by it (0.4.14 on the Z Fold8: SystemUI kept the image's, no fold layout).
+STAGE="$STAGE" BB="$BB" /system/bin/sh "$STAGE/fold8_coloros.sh" prepare || exit 3
 # ColorOS feature switches the guest needs, added to com.oplus.features_config.xml
 # in its system_ext, a feature file it already loads (the my_* feature files are
 # only read with CUST_LEVEL_LIST, which OPPO's init sets):
@@ -585,6 +648,19 @@ FORM="${ONEOS_GUEST_FORM:-fold}"
 case "$FORM" in fold|tablet|phone) ;; *) echo "WARNING: ONEOS_GUEST_FORM=$FORM unknown, using fold"; FORM=fold ;; esac
 if [ -f "$FEAT" ]; then
     ADDED="oplus.software.display.multibits_dimming_support"
+    # Galaxy Z Fold8, Find N6 (pull request #1): Live Alerts, AOD, fold animations,
+    # separate wallpapers per panel and haptic sounds, as the Find N6 declares them.
+    if [ "${ONEOS_PROFILE:-}" = f8 ] &&
+       grep -q '^  "image": "coloros17-findn6",$' "$STAGE/.oneos_stage"; then
+        ADDED="$ADDED oplus.software.support_fluid_entry oplus.software.fluid_replace_ntf"
+        ADDED="$ADDED oplus.software.display.aod_support oplus.software.adaptive_smooth_animation"
+        ADDED="$ADDED oplus.software.flexible_exchange_animation"
+        # Stock Find N6: my_stock/etc/extension/com.oplus.oplus-feature.xml.
+        # The container does not load that component's feature catalogue.
+        ADDED="$ADDED oplus.software.flexible_freeform.support oplus.software.pocketstudio.support"
+        ADDED="$ADDED oplus.software.wallpaper.separate_wallpaper_for_multi_display"
+        ADDED="$ADDED oplus.software.audio.haptic_channel_support"
+    fi
     case "$FORM" in
         fold) ADDED="$ADDED oplus.hardware.type.fold"
             if [ "${ONEOS_GUEST_UNFOLD_PORTRAIT:-1}" = 1 ]; then
@@ -703,7 +779,7 @@ fi
 # parseable; plat_seapp_contexts (system_server's rule, same AOSP build as the
 # host) is left alone. The host's types come from its CIL files, so this
 # follows whatever policy the phone has. ONEOS_GUEST_SEAPP=0 keeps ColorOS's files.
-SEAPP_FILES="$GUEST_SYSTEM_EXT/etc/selinux/system_ext_seapp_contexts $ROOTFS/system/product/etc/selinux/product_seapp_contexts"
+SEAPP_FILES="$GUEST_SYSTEM_EXT/etc/selinux/system_ext_seapp_contexts $GUEST_PRODUCT/etc/selinux/product_seapp_contexts"
 for f in $SEAPP_FILES; do $BB umount -l "$f" 2>/dev/null; done
 if [ "${ONEOS_GUEST_SEAPP:-1}" = 1 ]; then
     HOST_TYPES="$STAGE/host_sepolicy_types.txt"
@@ -2272,6 +2348,19 @@ for m in com.android.nfcservices com.android.bt; do
     done
 done
 
+# Play services from One UI's copy in my_product (guest_google.sh prepare wrote
+# google_apps/active): hide One UI's own GmsCore in the gmssystem APEX bind, so
+# the guest's package manager finds Play services once, where the image's
+# privapp-permissions-google-product.xml grants it. Private first, as above.
+if [ -f "$STAGE/google_apps/active" ]; then
+    for d in "$ROOTFS/apex/com.google.android.gmssystem" "$ROOTFS/apex/com.google.android.gmssystem"@*; do
+        [ -d "$d/priv-app" ] || continue
+        $BB mount --make-private "$d" 2>/dev/null || { echo "!!! could not make $d private, leaving it alone"; continue; }
+        $BB mount -t tmpfs -o ro,size=4k,mode=755 tmpfs "$d/priv-app" &&
+            echo "Hid host com.google.android.gmssystem/priv-app in $(basename "$d") (Play services from One UI's copy in my_product)"
+    done
+fi
+
 # The android.uid.networkstack group has to come from one signer. With the
 # host's tethering (Google-signed) and cellbroadcast APEXes kept, use the
 # host's NetworkStackGoogle and CaptivePortalLoginGoogle in place of ColorOS's
@@ -2357,7 +2446,7 @@ if [ "$GMS_WANT" = 1 ]; then
         exit 3
     }
     GMS_APEX="$ROOTFS/apex/com.google.android.gmssystem"
-    GMS_DIR="$ROOTFS/system/product/priv-app/PrebuiltGmsCore"
+    GMS_DIR="$GUEST_PRODUCT/priv-app/PrebuiltGmsCore"
     GMS_PKG="$STAGE/gmscore"
     # 1. The payload is the guest's: its loop device (payload_loops, written by
     #    mount_payload), backed by the staged payload, on top at the APEX path.
@@ -2463,8 +2552,8 @@ if [ "${ONEOS_GUEST_HIDE_GMS:-0}" = 1 ]; then
     hid=0
     for a in GmsCore PrebuiltGmsCore Phonesky GooglePartnerSetup PartnerSetupPrebuilt 'GoogleRestore*' \
              ConfigUpdater 'PlayAutoInstallConfig*' GoogleServicesFramework; do
-        for d in "$ROOTFS/my_product/priv-app/"$a "$ROOTFS/system/priv-app/"$a "$ROOTFS/system/product/priv-app/"$a \
-                 "$ROOTFS/system/product/app/"$a "$GUEST_SYSTEM_EXT/priv-app/"$a; do
+        for d in "$ROOTFS/my_product/priv-app/"$a "$ROOTFS/system/priv-app/"$a "$GUEST_PRODUCT/priv-app/"$a \
+                 "$GUEST_PRODUCT/app/"$a "$GUEST_SYSTEM_EXT/priv-app/"$a; do
             [ -d "$d" ] && [ ! -L "$d" ] || continue
             $BB mount -t tmpfs -o ro,size=4k,mode=755 tmpfs "$d" && { echo "Hid guest ${d#$ROOTFS/} (ONEOS_GUEST_HIDE_GMS=1)"; hid=$((hid + 1)); }
         done
@@ -2481,11 +2570,25 @@ fi
 # Pixel's GmsCore APK is in a product APEX the phone's apexd never activates,
 # and ONEOS_GUEST_HIDE_GMS hides the others. So when the guest has no GmsCore
 # APK, each such file is bound from a stage copy without the gms splits; the
-# image is unchanged. Stale binds of a former session come off first.
-SPLIT_DIRS="$ROOTFS/system/etc/permissions $ROOTFS/system/product/etc/permissions $GUEST_SYSTEM_EXT/etc/permissions $ROOTFS/my_product/etc/permissions"
+# image is unchanged. Stale binds of a former session come off first: only this
+# filter's own (oneos_split_*.xml). Up to 0.4.14 every bind on a permissions
+# XML came off here, the ColorOS feature list bound above (FEAT) with them, so
+# none of its additions reached a session (pull request #1, Z Fold8).
+SPLIT_DIRS="$ROOTFS/system/etc/permissions $GUEST_PRODUCT/etc/permissions $GUEST_SYSTEM_EXT/etc/permissions $ROOTFS/my_product/etc/permissions"
 for d in $SPLIT_DIRS; do
     for f in "$d"/*.xml; do
-        [ -f "$f" ] && mount | grep -q " $f " && $BB umount -l "$f" 2>/dev/null
+        [ -f "$f" ] || continue
+        # Remove only this filter's bind, not ColorOS feature or other XML
+        # overrides mounted earlier in prepare. On /data's filesystem the
+        # mount root omits the /data prefix; retain support for both forms.
+        split_source=$(awk -v target="$f" '$5 == target { source = $4 } END { print source }' /proc/self/mountinfo)
+        case "$split_source" in
+            "$STAGE"/oneos_split_*.xml|"${STAGE#/data}"/oneos_split_*.xml)
+                split_id=${split_source##*/oneos_split_}; split_id=${split_id%.xml}
+                case "$split_id" in ''|*[!0-9]*) continue ;; esac
+                $BB umount -l "$f" 2>/dev/null
+                ;;
+        esac
     done
 done
 rm -f "$STAGE"/oneos_split_*.xml
@@ -2570,5 +2673,16 @@ fi
 # resources, system_server boot loop, reboot). A private bind does not change
 # the source mount.
 $BB mount --make-rprivate "$ROOTFS" 2>/dev/null || true
+
+# Nothing of the guest on One UI's own partitions (host_part_mounts, top).
+host_part_mounts > "$STAGE/host_part_mounts.after"
+LEAKED=$(awk 'NR == FNR { b[$0] = 1; next } !($0 in b)' "$STAGE/host_part_mounts.before" "$STAGE/host_part_mounts.after")
+if [ -n "$LEAKED" ]; then
+    echo "ERROR: the setup mounted over One UI's own partitions:" $LEAKED
+    for m in $(echo "$LEAKED" | sort -r); do $BB umount -l "$m" 2>/dev/null && echo "  unmounted $m"; done
+    echo "Not starting the guest"
+    exit 3
+fi
+echo "One UI's partitions: no mount added by the setup"
 
 echo "=== ALL MOUNTS PREPARED SUCCESSFULLY ==="

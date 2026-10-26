@@ -104,7 +104,8 @@ object SessionEnv {
         val form = when (profile.form) {
             FormFactor.FOLD -> FOLD_FORM
             FormFactor.BAR -> BAR_FORM
-            FormFactor.FLIP -> throw IllegalArgumentException("no session settings for a Flip (${profile.id})")
+            // 0.4.17, Galaxy Z Flip7: a phone on the main panel; no cover layout yet.
+            FormFactor.FLIP -> BAR_FORM
         }
         val out = linkedMapOf(
             "ONEOS_APP" to "1",

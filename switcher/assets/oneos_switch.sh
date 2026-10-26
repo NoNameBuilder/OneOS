@@ -94,7 +94,7 @@ fi
 root_only "$STAGE" || app_refuse "$STAGE is not root's or is writable by others ($(stat -c '%U:%G %A' "$STAGE" 2>/dev/null))"
 [ -f "$STAGE/system.raw" ] || refuse "the guest image ($STAGE/system.raw) is not staged"
 for f in oneos_switch.sh guest_prepare.sh guest_start.sh guest_props.sh return_to_oneui.sh \
-         check_host_apex.sh bridges.sh zygote_exec guards.txt services_patched.jar; do
+         check_host_apex.sh bridges.sh fold8_coloros.sh guest_google.sh zygote_exec guards.txt services_patched.jar; do
     [ -f "$STAGE/$f" ] || refuse "$STAGE/$f is missing"
 done
 # The guarded jars: services_patched.jar, and oplus-services_patched.jar for a
@@ -221,7 +221,40 @@ case "$SPLASH_COMPONENT" in
     */*) ;;
     *) refuse "ONEOS_SPLASH_COMPONENT=$SPLASH_COMPONENT is not package/.Activity" ;;
 esac
+# One UI's property space. Each property context is one fixed-size file in
+# /dev/__properties__ (prop_area: a 128-byte header, bytes_used first) that
+# only grows: a property resetprop deletes leaves its slot behind until the
+# next reboot. With the in-place return the phone does not reboot between
+# sessions, and every session adds the guest's build properties (the persist.sys.*
+# ones to the same area as persist.sys.disable_rescue). The S25 Ultra's second
+# session of a night (485d5ffa, 0.4.17): init "__system_property_add failed"
+# for persist.sys.disable_rescue, guest_props added 339 of 439, and guest_start.sh
+# rightly refused to start the guest without it, after One UI was already
+# stopped. Checked here instead, before anything changes.
+pa_free() { # bytes left in the property area file $1
+    s=$(stat -c %s "$1" 2>/dev/null)
+    u=$("$BB" od -An -tu4 -N4 "$1" 2>/dev/null | tr -d ' ')
+    case "$s:$u" in *[!0-9:]*|:*|*:) return 1 ;; esac
+    echo $((s - 128 - u))
+}
+PA_CTX=$(getprop -Z persist.sys.disable_rescue 2>/dev/null)
+PA_FILE="/dev/__properties__/${PA_CTX:-u:object_r:system_prop:s0}"
+if PA_LEFT=$(pa_free "$PA_FILE"); then
+    [ "$PA_LEFT" -ge 16384 ] ||
+        refuse "One UI's property space is nearly full ($((PA_LEFT / 1024)) KB left in ${PA_FILE##*/}): the sessions since the phone last restarted used it up. Restart the phone, then switch again"
+    [ "$PA_LEFT" -ge 49152 ] || echo "WARNING: One UI's property space is getting full ($((PA_LEFT / 1024)) KB left in ${PA_FILE##*/}); some of the other system's settings may not load. Restart the phone before the next session"
+else
+    echo "WARNING: could not read the free property space in $PA_FILE"
+fi
 echo "Preflight passed (ONEOS_APP=$APP, profile ${ONEOS_PROFILE:-none}, busybox $BB, resetprop $RP, mount namespace $SELF_NS)"
+
+# Every ColorOS set (pull request #1 began it for the Z Fold8): copy One UI's
+# Play services and Play Store APK files, never their data, while One UI's
+# package manager still runs, after checking the stage's guards
+# (switcher/assets/guest_google.sh). It never refuses: without a copy the guest
+# starts without them.
+STAGE="$STAGE" BB="$BB" /system/bin/sh "$STAGE/guest_google.sh" snapshot ||
+    echo "!!! guest_google.sh snapshot failed; the guest starts without One UI's Play services"
 
 # mksh keeps a short here-document in memory and writes a long one to a temp
 # file in $TMPDIR, a directory it accepts once, when the shell starts, and
@@ -343,6 +376,28 @@ if [ -n "$HOLE" ] && [ "$HOLE" = "${HOLE%%[!0-9,:]*}" ]; then
     echo "$HOLE" > "$STAGE/host_screenhole" && echo "Host camera hole: $HOLE"
 else
     echo "Host camera hole: not read ($(printf '%s\n' "$HOLE" | grep -c .) internal displays with a top cutout)"
+fi
+# This phone's cutout and status bar height, for the UI activator's overlays in a
+# Pixel guest (a Galaxy S26 Ultra user, 0.4.17: Pixel's bar far taller than the
+# camera hole). The image's own device overlays (product, above OneOS's /oem
+# ones) give it the Pixel's cutout and status bar height. One UI's cutout spec
+# (cutoutSpec, "@dp", so the same at any resolution) and its status bar's height
+# (the statusBars inset at One UI's resolution, scaled to the panel's like the
+# hole), from a phone with one default-capable internal display only (a fold's
+# two panels are left alone).
+rm -f "$STAGE/host_statusbar"
+if [ "$(printf '%s\n' "$HLINE" | grep -c .)" = 1 ]; then
+    HCS=$(printf '%s\n' "$HLINE" | sed -n 's/.*cutoutSpec={\([^}]*\)}.*/\1/p' | head -n 1)
+    HSB=$(timeout 10 dumpsys window 2>/dev/null | sed -n "s/.*type=statusBars frame=\[0,0\]\[$HDW,\([0-9]*\)\].*/\1/p" | head -n 1)
+    case "$HDW:$HPW:$HSB" in
+        *[!0-9:]*|:*|*::*|*:) HSB='' ;;
+        *) [ "$HDW" -gt 0 ] && HSB=$(( (HSB * HPW + HDW / 2) / HDW )) || HSB='' ;;
+    esac
+    case "$HCS" in *[!-0-9A-Za-z._,@\ ]*) HCS='' ;; esac
+    if [ -n "$HCS$HSB" ]; then
+        { echo "spec=$HCS"; echo "height=$HSB"; } > "$STAGE/host_statusbar"
+        echo "Host status bar: cutout '${HCS:-none}', height ${HSB:-not read} px on the $HPW px panel"
+    fi
 fi
 # The cover panel of a fold, for guest_prepare.sh (ColorOS cover density): the
 # smaller of the two default-capable internal displays, as
@@ -578,6 +633,8 @@ set_prop ro.control_privapp_permissions log
 echo "=== [1/6] Protecting OneUI Home Screen and Disabling RescueParty ==="
 set_prop persist.sys.disable_rescue true
 set_prop sys.rescue_boot_count 0
+[ "$(getprop persist.sys.disable_rescue)" = true ] ||
+    echo "!!! persist.sys.disable_rescue did not take (property space: $(pa_free "$PA_FILE") bytes left); guest_start.sh will not start the guest"
 # OneOS: no snapshot of One UI Home's databases any more. OneLineage copied
 # them to /data/local/tmp/lineage_backups here and back over the live ones on
 # the way back: the only intended write into One UI's app data, never emptied.
@@ -757,6 +814,14 @@ if [ "${ONEOS_GAP_SPLASH:-1}" = 1 ]; then
     echo "Gap splash: $(grep -E '^(Status|LaunchState|TotalTime|Error)' "$GAP_SPLASH_LOG" 2>/dev/null | tr '\n' ' ')waited $((n / 5)).$((n % 5 * 2))s; One UI's surfaceflinger ${SF_FROZEN:-not frozen, black gap}${SF_FROZEN:+ frozen on it at $(date +%T)}"
 fi
 setprop ctl.stop zygote
+# zygote64_32 phones (Galaxy S23): One UI's 32-bit zygote is a service of its
+# own, and stopping zygote leaves it running. The guest's system_server then
+# asked it to preload (SecondaryZygotePreload, as the phone lists 32-bit ABIs):
+# One UI's idmap2 rewrote the framework overlay idmaps in /data/resource-cache,
+# the stage's through the bridge, under the guest's mapped copies, and the
+# guest's system_server died in IdmapResMap::Lookup 0.4 s later, every session
+# (699602d7). Stopped with zygote, kept stopped below, started on the return.
+[ -n "$(getprop init.svc.zygote_secondary)" ] && setprop ctl.stop zygote_secondary
 [ -n "$SF_FROZEN" ] || setprop ctl.stop surfaceflinger
 # audioserver/cameraserver are deliberately left running. The guest shares this
 # binder namespace, and its AudioService.<init> -> AudioDeviceBroker.init ->
@@ -770,6 +835,7 @@ kill -9 $(pidof bootanimation) 2>/dev/null || true
 kill -9 $(pidof app_process64) 2>/dev/null || true
 kill -9 $(pidof zygote_exec) 2>/dev/null || true
 kill -9 $(pidof zygote64) 2>/dev/null || true
+kill -9 $(pidof zygote_secondary) 2>/dev/null || true
 kill -9 $(pidof system_server) 2>/dev/null || true
 # Suppress the host zygote, so Samsung init does not resurrect it. OneOS: and
 # the host surfaceflinger: guest_start.sh restarts the vendor composer, whose
@@ -782,8 +848,13 @@ kill -9 $(pidof system_server) 2>/dev/null || true
 # A guest_audio.flag from an earlier session must not make the loop below stop
 # Samsung's audioserver in a session that keeps it (ONEOS_GUEST_AUDIO=0).
 rm -f "$STAGE/data/guest_audio.flag"
-nohup $BB sh -c "while true; do [ \"\$(getprop init.svc.zygote)\" = \"running\" ] && setprop ctl.stop zygote; [ ! -f $STAGE/data/oneos_host_sf_frozen ] && [ \"\$(getprop init.svc.surfaceflinger)\" = \"running\" ] && setprop ctl.stop surfaceflinger; [ \"\$(getprop init.svc.bootanim)\" = \"running\" ] && setprop ctl.stop bootanim; [ -f $STAGE/data/guest_audio.flag ] && [ \"\$(getprop init.svc.audioserver)\" = \"running\" ] && setprop ctl.stop audioserver; sleep 0.2; done" </dev/null >/dev/null 2>&1 &
+nohup $BB sh -c "while true; do [ \"\$(getprop init.svc.zygote)\" = \"running\" ] && setprop ctl.stop zygote; [ \"\$(getprop init.svc.zygote_secondary)\" = \"running\" ] && setprop ctl.stop zygote_secondary; [ ! -f $STAGE/data/oneos_host_sf_frozen ] && [ \"\$(getprop init.svc.surfaceflinger)\" = \"running\" ] && setprop ctl.stop surfaceflinger; [ \"\$(getprop init.svc.bootanim)\" = \"running\" ] && setprop ctl.stop bootanim; [ -f $STAGE/data/guest_audio.flag ] && [ \"\$(getprop init.svc.audioserver)\" = \"running\" ] && setprop ctl.stop audioserver; sleep 0.2; done" </dev/null >/dev/null 2>&1 &
 sleep 1
+# One UI's system_server kept Samsung's softdog (/dev/watchdog, 100 s) and is
+# gone: its magic close now, before guest_prepare.sh's feeder takes over (see
+# there; the Exynos phones panicked when nothing fed it).
+if e=$(printf V 2>&1 > /dev/watchdog); then echo "Softdog: /dev/watchdog closed with V (One UI's system_server stopped)"
+else echo "Softdog: /dev/watchdog not written ($e)"; fi
 echo "After the stop: CPU max/hw kHz: $(cpu_caps); skin: $(skin_temp)"
 
 # --- MOUNT PREPARATION ---
@@ -1021,6 +1092,40 @@ readlink "/proc/$TAKEOVER_PID/ns/mnt" > "$STAGE/guest_mntns" 2>/dev/null
 stat -c %d "$STAGE/rootfs" > "$STAGE/guest_rootdev" 2>/dev/null
 echo "Guest mount namespace: $(cat "$STAGE/guest_mntns" 2>/dev/null) (host: $(readlink /proc/1/ns/mnt))"
 echo "Takeover daemon PID: $TAKEOVER_PID"
+# The guest zygote's sockets. On an S24 Ultra with LSPosed's Vector daemon
+# (0.4.15), 20 s into the session the daemon restarted One UI's zygote: init
+# made /dev/socket/zygote and usap_pool_primary over the guest's, the loop
+# above stopped that zygote, and init's cleanup unlinked both files. The
+# guest's system_server then found no zygote socket ("Error connecting to
+# zygote ... No such file or directory") and no app ever started. /dev is the
+# same tmpfs in the guest, so once zygote_exec has made them and turned into
+# app_process64 (the takeover pid), each is bound onto itself here, in init's
+# mount namespace. init can then neither unlink nor replace them (EBUSY): a
+# restarted One UI zygote starts without its sockets and the loop stops it,
+# and the guest keeps its own. return_to_oneui.sh takes the binds off before
+# One UI's zygote starts again; a reboot drops them.
+protect_zygote_sockets() {
+    n=0
+    while :; do
+        case "$(readlink "/proc/$TAKEOVER_PID/exe" 2>/dev/null)" in
+            */app_process64) break ;;
+            '') echo "Zygote sockets: the takeover process is gone, nothing to protect"; return 0 ;;
+        esac
+        n=$((n + 1))
+        [ $n -lt 3000 ] || { echo "Zygote sockets: the guest zygote did not start within 300 s, not protected"; return 0; }
+        sleep 0.1
+    done
+    for s in zygote usap_pool_primary; do
+        f=/dev/socket/$s
+        if [ -S "$f" ] && ! $BB awk -v m="$f" '$5 == m { f = 1 } END { exit !f }' /proc/self/mountinfo &&
+           $BB mount --bind "$f" "$f"; then
+            echo "Zygote sockets: $f bound onto itself at $(date +%T) (One UI's zygote is $(getprop init.svc.zygote))"
+        else
+            echo "!!! Zygote sockets: $f not protected (socket: $([ -S "$f" ] && echo yes || echo no))"
+        fi
+    done
+}
+protect_zygote_sockets </dev/null &
 # Gap splash safety net: guest_start.sh releases the frozen surfaceflinger
 # about 1 s after the pivot. If it never gets there (a FATAL exit), kill it
 # here, so the panel and the auto-return below behave as without the splash.
@@ -1285,6 +1390,34 @@ while true; do
                 fi
                 echo \"[UI Activator] dialer: \$DST; now \$(timeout 20 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys package com.google.android.dialer 2>/dev/null | grep -m 1 -o 'android.permission.BLUETOOTH_CONNECT: granted=[a-z]*' || echo 'BLUETOOTH_CONNECT state not read')\"
             fi
+            # This phone's cutout and status bar height in a Pixel guest (the
+            # switch saved One UI's in host_statusbar). Fabricated overlays are
+            # mutable: enabled, they come above every static overlay, the
+            # image's device ones in product included. The guest's DisplayManager
+            # takes the cutout again on the overlay change and SystemUI the
+            # height; later sessions start with them. Re-made every session (a
+            # resolution change moves the height). ONEOS_GUEST_HOST_CUTOUT=0
+            # leaves them out.
+            if [ $GUEST_OPLUS = 0 ] && [ \"${ONEOS_GUEST_HOST_CUTOUT:-1}\" = 1 ] && [ -f $STAGE/host_statusbar ] && [ ! -L $STAGE/host_statusbar ]; then
+                gxo() { timeout 20 $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/cmd overlay \"\$@\" >/dev/null 2>&1; }
+                HCS=\$(sed -n 's/^spec=//p' $STAGE/host_statusbar | head -n 1)
+                HSB=\$(sed -n 's/^height=//p' $STAGE/host_statusbar | head -n 1)
+                OVS=''
+                if [ -n \"\$HCS\" ] &&
+                   gxo fabricate --target android --name OneOSCutout android:string/config_mainBuiltInDisplayCutout string \"\$HCS\" &&
+                   gxo fabricate --target android --name OneOSCutoutRect android:string/config_mainBuiltInDisplayCutoutRectApproximation string \"\$HCS\"; then
+                    OVS='OneOSCutout OneOSCutoutRect'
+                fi
+                case \"\$HSB\" in
+                    ''|*[!0-9]*) ;;
+                    *) for r in status_bar_height_default:OneOSStatusBarHeight status_bar_height_portrait:OneOSStatusBarHeightPortrait; do
+                           gxo fabricate --target android --name \${r#*:} android:dimen/\${r%%:*} 0x05 \$((HSB * 256)) && OVS=\"\$OVS \${r#*:}\"
+                       done ;;
+                esac
+                ON=''
+                for o in \$OVS; do gxo enable --user 0 com.android.shell:\$o && ON=\"\$ON \$o\"; done
+                echo \"[UI Activator] status bar: One UI's cutout '\${HCS:-none}', height \${HSB:-?} px; overlays on:\${ON:- none}\"
+            fi
             # Fold test (fold layout only). On every lid switch event record what
             # the guest did: device state, layout, both touch mappers and
             # backlights, a screenshot of display 0, and after folding 10 s of
@@ -1459,6 +1592,11 @@ while true; do
             fi
             echo '[UI Activator] Creating missing app data dirs...'
             $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/sh /data/local/tmp/fix_app_dirs.sh 2>/dev/null || true
+
+            # Galaxy Z Fold8, Find N6 set: AOD, widgets, taskbar and the hinge relay in the guest.
+            if [ \"${ONEOS_PROFILE:-}\" = f8 ] && grep -q coloros17-findn6 \"$STAGE/.oneos_stage\" && [ -f \"$STAGE/data/oneos_fold8/runtime.sh\" ]; then
+                $BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/sh /data/oneos_fold8/runtime.sh runtime >\"$STAGE/fold8_runtime.log\" 2>&1 || echo '[UI Activator] Fold8 runtime setup failed; see fold8_runtime.log'
+            fi
 
             # Populate network permissions for all installed packages
             for uid in \$($BB nsenter -t \$PID -m /system/bin/sh /data/oneos_genv.sh /system/bin/pm list packages -U 2>/dev/null | grep -o 'uid:[0-9]*' | cut -d: -f2 | sort -u); do
@@ -1655,7 +1793,7 @@ if [ "$RETURN_MAX" -gt 0 ]; then
                         timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/screencap -d \$id -p /data/local/tmp/shot_\$id.png 2>>\$D/screencap.err
                         cp $STAGE/data/local/tmp/shot_\$id.png \$D/ 2>/dev/null
                     done
-                    for b in /sys/class/backlight/panel0-backlight /sys/class/backlight/panel1-backlight; do echo \"\$b: \$(cat \$b/brightness) actual=\$(cat \$b/actual_brightness) max=\$(cat \$b/max_brightness)\"; done > \$D/backlight.txt 2>&1
+                    for b in /sys/class/backlight/panel0-backlight /sys/class/backlight/panel1-backlight /sys/class/backlight/panel /sys/class/backlight/panel1; do [ -d \$b ] || continue; echo \"\$b: \$(cat \$b/brightness) actual=\$(cat \$b/actual_brightness) max=\$(cat \$b/max_brightness)\"; done > \$D/backlight.txt 2>&1
                     tail -5 $STAGE/data/backlight.log >> \$D/backlight.txt 2>/dev/null
                     timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys power > \$D/power.txt 2>&1
                     timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys device_state > \$D/device_state.txt 2>&1
@@ -1723,6 +1861,14 @@ if [ "$RETURN_MAX" -gt 0 ]; then
                         # 55af6cc8: compass and camera did not work, and nothing in the logs told why).
                         timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys sensorservice > \$D/sensors.txt 2>&1
                         timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys media.camera > \$D/camera.txt 2>&1
+                        # WebView and the zygote sockets (S24 Ultra, IN build, session 77e7789e: the
+                        # WebView zygote start found no zygote socket file).
+                        { timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/dumpsys webviewupdate
+                          echo; ls -la /dev/socket 2>&1 | grep -i zygote
+                          echo; $BB nsenter -t \$SFP -m ls -la /dev/socket 2>&1 | grep -i zygote
+                          echo; grep ' /dev/socket/' /proc/1/mountinfo
+                          echo; getprop | grep -E 'abilist|ro.zygote'
+                        } > \$D/webview.txt 2>&1
                         # Is the Wallpapers fold-grid overlay (guest_prepare.sh) enabled?
                         timeout 15 $BB nsenter -t \$SFP -m /system/bin/sh /data/oneos_genv.sh /system/bin/cmd overlay list com.oplus.wallpapers > \$D/overlays_wallpapers.txt 2>&1
                         for e in /sys/class/input/event*; do

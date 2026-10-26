@@ -39,6 +39,14 @@ enum class FileRole {
      * uses the jar only while both still match.
      */
     INJECTION_SHA256,
+    /**
+     * A Galaxy Z Fold8 fix for the Find N6 image (n6-f8, 0.4.14, ported from
+     * pull request #1): the patched SystemUI bound over the image's, the
+     * hinge-angle relay dex, and OPPO's AOD, UMS and Instant APKs from the
+     * same firmware, installed in the guest (switcher/assets/fold8_coloros.sh).
+     * Never run in One UI.
+     */
+    GUEST_FIX,
 }
 
 /** One file of a set, by its flat name in `$STAGE`. */
@@ -145,6 +153,7 @@ data class PackageSet(
 
 object PackageSets {
     const val ID_N6_F8U = "n6-f8u"
+    const val ID_N6_F8 = "n6-f8"
     const val ID_X9U_SULTRA = "x9u-sultra"
     const val ID_X9U_IN_SULTRA = "x9u-in-sultra"
     const val ID_PIXEL_F8U = "pixel-f8u"
@@ -214,6 +223,24 @@ object PackageSets {
         hasReturnApp = true,
     )
 
+    /**
+     * Find N6 image on the Galaxy Z Fold8 (0.4.14, ported from pull request
+     * #1): the Fold's set and the [FileRole.GUEST_FIX] files
+     * scripts/make-fold8-coloros.py builds from it (cover status bar and Quick
+     * Settings, hinge angle, wallpaper handoff, AOD, widgets, taskbar).
+     */
+    val N6_F8 = PackageSet(
+        id = ID_N6_F8,
+        imageId = Images.ID_FIND_N6,
+        sourceDir = "out/overlays_n6_fold8",
+        files = N6_F8U.files + listOf(
+            "Fold8SystemUI.apk", "Fold8AngleRelay.dex", "Fold8Aod.apk", "Fold8UMS.apk", "Fold8Instant.apk",
+        ).map { PackageFile(it, FileRole.GUEST_FIX) },
+        omitted = listOf(TETHERING),
+        approxBytes = 662_818_414L,
+        hasReturnApp = true,
+    )
+
     val X9U_SULTRA = PackageSet(
         id = ID_X9U_SULTRA,
         imageId = Images.ID_FIND_X9U,
@@ -228,10 +255,10 @@ object PackageSets {
     val X9U_IN_SULTRA = PackageSet(
         id = ID_X9U_IN_SULTRA,
         imageId = Images.ID_FIND_X9U_IN,
-        sourceDir = "out/overlays_x9u_in_r50",
+        sourceDir = "out/overlays_x9u_in_r51",
         files = COMMON + PackageFile(CELLBROADCAST, FileRole.APEX_PAYLOAD),
         omitted = listOf(TETHERING, WALLPAPER_GRID_RRO),
-        approxBytes = 327_686_210L,
+        approxBytes = 327_686_370L,
         hasReturnApp = true,
     )
 
@@ -287,7 +314,7 @@ object PackageSets {
         hasReturnApp = true,
     )
 
-    val ALL: List<PackageSet> = listOf(N6_F8U, X9U_SULTRA, X9U_IN_SULTRA, PIXEL_F8U, PIXEL_SULTRA)
+    val ALL: List<PackageSet> = listOf(N6_F8U, X9U_SULTRA, X9U_IN_SULTRA, PIXEL_F8U, PIXEL_SULTRA, N6_F8)
 
     fun byId(id: String, sets: List<PackageSet> = ALL): PackageSet? = sets.firstOrNull { it.id == id }
 }

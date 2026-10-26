@@ -169,6 +169,10 @@ for g in guest_no_gatekeeper guest_pdb_readonly guest_no_apex_installs guest_app
 done
 # The guest's own idmap2d instead of One UI's (patches/guest_own_idmap.py).
 KEY_DIRS="$KEY_DIRS $(python3 -I "$ROOT/switcher/patches/guest_own_idmap.py" "$WORK/services")"
+# A WebView zygote that cannot start is logged, not fatal (S24 Ultra, Find X9
+# Ultra IN, session 77e7789e: system_server died 60 s into boot;
+# patches/guest_webview_zygote_safe.py).
+KEY_DIRS="$KEY_DIRS $(python3 -I "$ROOT/switcher/patches/guest_webview_zygote_safe.py" "$WORK/services")"
 # The guest's own vold as "gvld", with vold_patched above; no guest call left
 # that reaches One UI's "vold" (patches/guest_own_vold.py).
 if [ "$VOLD_GVLD" = 1 ]; then

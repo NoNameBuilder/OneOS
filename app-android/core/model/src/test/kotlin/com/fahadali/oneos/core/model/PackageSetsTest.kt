@@ -13,7 +13,7 @@ class PackageSetsTest {
     private val pixel = PackageSets.PIXEL_F8U
     private val xin = PackageSets.X9U_IN_SULTRA
 
-    /** sha256sum of out/overlays_n6_r50, out/overlays_x9u_r50, out/overlays_x9u_in_r50 (2026-10-25) and out/overlays_pixel_yogi (2026-10-24) without the omitted files. */
+    /** sha256sum of out/overlays_n6_r50, out/overlays_x9u_r50, out/overlays_x9u_in_r51 (2026-10-25) and out/overlays_pixel_yogi (2026-10-24) without the omitted files. */
     private fun shas(set: PackageSet) = Bundles.text("packages/${set.id}.sha256")
 
     private fun guards(set: PackageSet) = Bundles.text("packages/${set.id}.guards.txt")
@@ -35,10 +35,23 @@ class PackageSetsTest {
         assertEquals(Images.ID_PIXEL_YOGI, pixel.imageId)
         assertEquals("out/overlays_n6_r50", n6.sourceDir)
         assertEquals("out/overlays_x9u_r50", x9u.sourceDir)
-        assertEquals("out/overlays_x9u_in_r50", xin.sourceDir)
+        assertEquals("out/overlays_x9u_in_r51", xin.sourceDir)
         assertEquals(Images.ID_FIND_X9U_IN, xin.imageId)
         assertEquals("out/overlays_pixel_yogi", pixel.sourceDir)
-        assertEquals(listOf(n6, x9u, xin, pixel, PackageSets.PIXEL_SULTRA), PackageSets.ALL)
+        assertEquals(listOf(n6, x9u, xin, pixel, PackageSets.PIXEL_SULTRA, PackageSets.N6_F8), PackageSets.ALL)
+        // The Z Fold8's Find N6 set (0.4.14, pull request #1): the Fold's files and five Fold8 fixes.
+        val f8 = PackageSets.N6_F8
+        assertEquals(Images.ID_FIND_N6, f8.imageId)
+        assertEquals("out/overlays_n6_fold8", f8.sourceDir)
+        assertEquals(n6.files, f8.files.filter { it.role != FileRole.GUEST_FIX })
+        assertEquals(
+            listOf("Fold8SystemUI.apk", "Fold8AngleRelay.dex", "Fold8Aod.apk", "Fold8UMS.apk", "Fold8Instant.apk"),
+            f8.files.filter { it.role == FileRole.GUEST_FIX }.map { it.name },
+        )
+        // Its base files are the Fold's, byte for byte (built from out/overlays_n6_r50).
+        val fold = ShaList.parse(shas(n6)).entries
+        val fold8 = ShaList.parse(shas(f8)).entries
+        for ((name, hash) in fold) assertEquals(name, hash, fold8[name])
         // Owner: leave out only dead weight.
         assertEquals(listOf("tethering_payload.img"), n6.omitted)
         assertEquals(listOf("tethering_payload.img", "OneOSWallpapersFoldGrid.apk"), x9u.omitted)

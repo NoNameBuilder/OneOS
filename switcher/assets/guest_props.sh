@@ -15,6 +15,10 @@ ADDED="$STAGE/guest_props.added"
 # Host values that `add` overrides for the session (key=host value);
 # `remove` puts them back before One UI's system_server reads them.
 OVR="$STAGE/guest_props.overridden"
+# Names `remove` blanked instead of deleting (see remove), for this boot
+# (guest_props.blanked.boot): while still empty they are the guest's, and the
+# next session's `add` writes into their slots again.
+BLANKED="$STAGE/guest_props.blanked"
 # The root manager's own resetprop (KernelSU, APatch), never a search of /data.
 # Missing is fatal: exiting 0 here (OneLineage) skipped the persist snapshot and
 # its restore without a word, and One UI then booted with the guest's settings.
@@ -57,6 +61,10 @@ set_aside() {
 # guest_props.overridden would set whatever an older stage wrote there (the
 # remove of a hard reset). `add` records the boot in guest_props.boot.
 drop_stale_memory_lists() {
+    if [ -f "$BLANKED" ] && [ "$(cat "$BLANKED.boot" 2>/dev/null)" != "$BOOT_ID" ]; then
+        rm -f "$BLANKED" "$BLANKED.boot"
+        echo "guest_props: guest_props.blanked is from before this boot, dropped (its props died with the reboot)"
+    fi
     if [ -f "$STAGE/guest_props.boot" ]; then
         [ "$(cat "$STAGE/guest_props.boot" 2>/dev/null)" = "$BOOT_ID" ] && return 0
     else
@@ -87,8 +95,18 @@ add)
         rm -f "$OVR"
     fi
     echo "$BOOT_ID" > "$STAGE/guest_props.boot"
-    # One getprop for the whole host set instead of one per key.
-    getprop | sed -n 's/^\[\([^]]*\)\].*/\1/p' > "$HOST"
+    # One getprop for the whole host set instead of one per key. An empty
+    # value counts as unset (as for Android's readers), so the props an
+    # earlier session of this boot blanked (remove) are the guest's again;
+    # persist.* ones only by the list, since One UI stores its own empty ones.
+    getprop | awk -v bf="$BLANKED" '
+        BEGIN { while ((getline k < bf) > 0) b[k] = 1 }
+        {
+            i = index($0, "]: ["); if (substr($0, 1, 1) != "[" || i < 3) next
+            k = substr($0, 2, i - 2)
+            if (substr($0, i + 4) == "]" && (k !~ /^persist\./ || (k in b))) next
+            print k
+        }' > "$HOST"
     # Lowest priority first; a later file wins for a key defined twice.
     ls "$ROOTFS"/system/build.prop \
        "$ROOTFS"/system/system_ext/etc/build.prop \
@@ -336,7 +354,7 @@ add)
     # (Pixel), and not over a value One UI has. ONEOS_GUEST_NIGHT_LIGHT=0 leaves
     # it out.
     NM=persist.sys.overlay.nightmode
-    if [ "${ONEOS_GUEST_NIGHT_LIGHT:-1}" = 1 ] && [ -f "$ROOTFS/system/product/overlay/treble-overlay-NightMode.apk" ]; then
+    if [ "${ONEOS_GUEST_NIGHT_LIGHT:-1}" = 1 ] && { [ -f "$ROOTFS/system/product/overlay/treble-overlay-NightMode.apk" ] && [ ! -L "$ROOTFS/system/product" ]; }; then
         if grep -qxF "$NM" "$HOST"; then
             echo "guest_props: $NM is One UI's ($(getprop "$NM")), left alone"
         else
@@ -344,6 +362,27 @@ add)
             echo "$NM=true" >> "$NEW"
             echo "guest_props: $NM=true for the session (Night Light: the image's treble NightMode overlay)"
         fi
+    fi
+    # ColorOS's first-boot clock. OplusNewNetworkTimeUpdateServiceFeature.
+    # checkSystemTime (oplus-services.jar) takes every boot with
+    # persist.sys.device_first_boot unset (default true) for the phone's first
+    # and sets the clock to 1 January of the build year: the shared kernel
+    # clock read 2026-01-01 until network time came back (Galaxy S26+ 80387c66,
+    # S25 Ultra 485d5ffa), and the Galaxy S23 (699602d7) returned to One UI on
+    # it. 0 for the session, not over a value One UI has.
+    key=persist.sys.device_first_boot
+    if [ -f "$ROOTFS/system/framework/oplus-services.jar" ] && ! grep -qxF "$key" "$HOST"; then
+        sed -i "/^$key=/d" "$NEW"
+        echo "$key=0" >> "$NEW"
+        echo "guest_props: $key=0 for the session (no first-boot clock reset to 1 January)"
+    fi
+    # Galaxy Z Fold8, Find N6 (pull request #1): the image's cover camera bounds are the
+    # Find N6's; this cover is 1248 px wide. Session-only, removed on return.
+    if [ "${ONEOS_PROFILE:-}" = f8 ] &&
+       grep -q '^  "image": "coloros17-findn6",$' "$STAGE/.oneos_stage"; then
+        key=ro.oplus.display.secondary.screenhole.position
+        sed -i "/^$key=/d" "$NEW"
+        echo "$key=589,0:659,104" >> "$NEW"
     fi
     if "$RP" -n -f "$NEW" 2>/dev/null; then
         cut -d= -f1 "$NEW" > "$ADDED"
@@ -394,6 +433,22 @@ add)
         echo "$key=$h" >> "$OVR" && "$RP" -n "$key" "$g" 2>/dev/null &&
             echo "guest_props: $key=$g for the session (One UI: $h)"
     done
+    # A 64-bit guest on a phone with 32-bit ABIs (Galaxy S23: zygote64_32,
+    # armeabi-v7a and armeabi). The guest has no app_process32 and the switch
+    # stops One UI's zygote_secondary, yet with One UI's ABI lists its
+    # system_server asked for a 32-bit zygote: ZygoteProcess.bootCompleted
+    # threw "Failed to inform zygote of boot_completed" and took it down
+    # (1f4f0c7f, 0.4.18). The image's own lists for the session.
+    if [ ! -e "$ROOTFS/system/bin/app_process32" ] && [ -n "$(getprop ro.product.cpu.abilist32)" ]; then
+        for key in ro.product.cpu.abilist ro.product.cpu.abilist32 ro.system.product.cpu.abilist ro.system.product.cpu.abilist32; do
+            grep -q "^$key=" "$ROOTFS/system/build.prop" 2>/dev/null || continue
+            g=$(sed -n "s/^$key=//p" "$ROOTFS/system/build.prop" | tail -n 1)
+            h=$(getprop "$key")
+            [ "$g" != "$h" ] || continue
+            echo "$key=$h" >> "$OVR" && "$RP" -n "$key" "$g" 2>/dev/null &&
+                echo "guest_props: $key='$g' for the session (One UI: $h; the guest has no 32-bit zygote)"
+        done
+    fi
     # No isolated compilation from the guest. SystemServer starts
     # IsolatedCompilationService when ro.config.isolated_compilation_enabled is
     # true (One UI: true); it schedules compiles in the HOST's composd (One UI's
@@ -417,12 +472,63 @@ remove)
     fi
     rm -f "$STAGE/guest_props.boot"
     [ -f "$ADDED" ] || exit 0
-    removed=0
-    while IFS= read -r key; do
-        "$RP" --delete "$key" 2>/dev/null && removed=$((removed + 1))
-    done < "$ADDED"
-    rm -f "$ADDED"
-    echo "guest_props: removed $removed guest props"
+    # Blanked, not deleted. resetprop's delete leaves a property's slot in its
+    # context's area (/dev/__properties__) until the next reboot, and the next
+    # add takes a new one. With the in-place return nothing reboots in between:
+    # the S25 Ultra's system_prop area was full by its second session of a
+    # night (485d5ffa: persist.sys.disable_rescue could not be added, the guest
+    # was not started). An empty value is what Android's readers take for an
+    # unset property (base::GetProperty, property_get and SystemProperties.get
+    # return their default), and the next session's add writes into the same
+    # slot (an empty value counts as unset there). Still deleted: persist.*
+    # props the guest's property service stored in /data/property (deleted
+    # there too, or One UI would load them at its next boot; -P lists the
+    # store, and without it every persist.* one is deleted the old way), and
+    # values of 92 bytes or more (long ro.* values, not blanked in place).
+    NOWF="$STAGE/guest_props.now"
+    getprop > "$NOWF"
+    stored_ok=0
+    "$RP" -P > "$STAGE/guest_props.stored" 2>/dev/null && stored_ok=1
+    awk -v ok=$stored_ok -v sf="$STAGE/guest_props.stored" -v nf="$NOWF" '
+        function key(l,  i) { i = index(l, "]: ["); return (substr(l, 1, 1) == "[" && i > 2) ? substr(l, 2, i - 2) : "" }
+        BEGIN {
+            while ((getline l < nf) > 0) { k = key(l); if (k == "") continue; v = substr(l, index(l, "]: [") + 4); sub(/\]$/, "", v); has[k] = 1; len[k] = length(v) }
+            while ((getline l < sf) > 0) { k = key(l); if (k != "") st[k] = 1 }
+        }
+        !($0 in has) { next }
+        /^persist\./ && (!ok || ($0 in st)) { print "P " $0; next }
+        len[$0] >= 92 { print "D " $0; next }
+        { print "B " $0 }' "$ADDED" > "$STAGE/guest_props.plan"
+    removed=0; blanked=0
+    # All blanks in one call, then each checked: whatever still has a value
+    # is blanked on its own, and deleted if that does not take either.
+    sed -n 's/^B \(.*\)$/\1=/p' "$STAGE/guest_props.plan" > "$STAGE/guest_props.blank"
+    [ -s "$STAGE/guest_props.blank" ] && "$RP" -n -f "$STAGE/guest_props.blank" 2>/dev/null
+    while read -r op key; do
+        case "$op" in
+            P) "$RP" -p --delete "$key" 2>/dev/null && removed=$((removed + 1)) ;;
+            D) "$RP" --delete "$key" 2>/dev/null && removed=$((removed + 1)) ;;
+        esac
+    done < "$STAGE/guest_props.plan"
+    getprop > "$NOWF"
+    : > "$BLANKED.new"
+    awk -v nf="$NOWF" '
+        BEGIN { while ((getline l < nf) > 0) { i = index(l, "]: ["); if (substr(l, 1, 1) != "[" || i < 3) continue; v = substr(l, i + 4); sub(/\]$/, "", v); val[substr(l, 2, i - 2)] = v } }
+        /^B / { k = substr($0, 3); print ((k in val) && val[k] == "" ? "E " : "S ") k }' "$STAGE/guest_props.plan" |
+    while read -r st key; do
+        if [ "$st" = E ] || { "$RP" -n "$key" "" 2>/dev/null && [ -z "$(getprop "$key")" ]; }; then
+            echo "$key" >> "$BLANKED.new"
+        else
+            "$RP" --delete "$key" 2>/dev/null && echo "$key" >> "$STAGE/guest_props.deleted"
+        fi
+    done
+    blanked=$(wc -l < "$BLANKED.new")
+    [ -f "$STAGE/guest_props.deleted" ] && removed=$((removed + $(wc -l < "$STAGE/guest_props.deleted")))
+    rm -f "$STAGE/guest_props.deleted"
+    { [ -f "$BLANKED" ] && cat "$BLANKED"; cat "$BLANKED.new"; } | sort -u > "$BLANKED.tmp" &&
+        mv -f "$BLANKED.tmp" "$BLANKED" && echo "$BOOT_ID" > "$BLANKED.boot"
+    rm -f "$ADDED" "$NOWF" "$BLANKED.new" "$STAGE/guest_props.stored" "$STAGE/guest_props.plan" "$STAGE/guest_props.blank"
+    echo "guest_props: blanked $blanked guest props (their slots are reused next session), deleted $removed"
     ;;
 snapshot-persist)
     # persist.* values the host has right now, before the guest can change
@@ -445,7 +551,9 @@ snapshot-persist)
             set_aside "$MARK" "$SNAP_FILE" || { echo "guest_props: could not move it aside, not taking a snapshot"; exit 1; }
         fi
     fi
-    getprop | sed -n 's/^\[\(persist\.[^]]*\)\]: \[\(.*\)\]$/\1=\2/p' > "$SNAP_FILE"
+    # Not the guest's blanked ones (remove): still empty, they are not One UI's.
+    getprop | sed -n 's/^\[\(persist\.[^]]*\)\]: \[\(.*\)\]$/\1=\2/p' |
+        awk -v bf="$BLANKED" 'BEGIN { while ((getline k < bf) > 0) b[k "="] = 1 } !($0 in b)' > "$SNAP_FILE"
     [ -s "$SNAP_FILE" ] || { echo "guest_props: ERROR: no persist props read"; rm -f "$SNAP_FILE"; exit 1; }
     sm=none; [ -f "$STAGE/.oneos_stage" ] && sm=$(sha "$STAGE/.oneos_stage")
     { echo "format=2"
@@ -513,8 +621,10 @@ restore-persist)
         return 1
     }
     # Added by the guest: delete from memory and from persistent storage.
+    # Not the ones remove blanked (still empty and not in the store).
     for key in $(cut -d= -f1 "$NOW"); do
         grep -q "^$key=" "$SNAP" && continue
+        grep -qxF "$key=" "$NOW" && [ -f "$BLANKED" ] && grep -qxF "$key" "$BLANKED" && continue
         echo "$key" | grep -q "$keep" && continue
         [ "$2" = "--recover" ] && ! guest_prop "$key" && continue
         if "$RP" -p --delete "$key" 2>/dev/null; then deleted=$((deleted + 1)); else failed=$((failed + 1)); fi

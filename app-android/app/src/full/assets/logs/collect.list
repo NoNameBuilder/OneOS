@@ -36,10 +36,24 @@ run logs.input 10 memory/input_devices.txt 'cat /proc/bus/input/devices'
 
 #== Session
 
-#: Why the phone last booted (the return reboots with reason oneos-return).
+#: Why the phone last booted (the return reboots with reason oneos-return),
+#: and Samsung's own record of the last reset where the phone keeps one
+#: (sec_debug: reset_reason such as KPON for a kernel panic, extra, auto_comment).
 run logs.reason 10 boot/reason.txt '
 printf "sys.boot.reason=%s\n" "$(getprop sys.boot.reason)"
-printf "persist.sys.boot.reason.history=%s\n" "$(getprop persist.sys.boot.reason.history)"'
+printf "persist.sys.boot.reason.history=%s\n" "$(getprop persist.sys.boot.reason.history)"
+printf "sys.reset_reason=%s\n" "$(getprop sys.reset_reason)"
+for f in /proc/reset_reason /proc/extra /proc/auto_comment; do
+  [ -r "$f" ] && printf "%s: %s\n" "$f" "$(head -c 2000 "$f" | tr -d "\000")"
+done
+true'
+
+#: The end of the kernel log of the boot before this one (Samsung's last_kmsg):
+#: what the kernel printed before a hard reset that left no return log (Galaxy
+#: S26+ 80387c66, Galaxy S23 699602d7).
+run logs.lastkmsg 20 boot/last_kmsg.txt '
+[ -r /proc/last_kmsg ] || exit 3
+tail -n 3000 /proc/last_kmsg | tr -d "\000"'
 
 #: The session record the app's launch wrote (session/current.json).
 run logs.current 10 stage/current.json '

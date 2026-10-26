@@ -223,6 +223,33 @@ fi
 pkill -9 -f "$S/rootfs/system/build.prop" 2>/dev/null || true
 rm -f /data/local/tmp/oneos/guest_mntns
 
+# The guest zygote's sockets were bound onto themselves in init's mount
+# namespace (oneos_switch.sh, protect_zygote_sockets), so that init could not
+# remove them while One UI's zygote was restarted during the session (LSPosed).
+# Off before anything starts One UI's zygote: init makes its own sockets at the
+# same paths, and replaces the dead guest's files itself. A bind that stays
+# means a reboot return.
+in_init_ns() {
+    if [ "$(readlink /proc/self/ns/mnt)" = "$(readlink /proc/1/ns/mnt)" ]; then "$@"
+    elif [ -n "$BB" ]; then "$BB" nsenter -t 1 -m -- "$@"
+    else nsenter -t 1 -m -- "$@"; fi
+}
+zs_bound() { awk -v m="$1" '$5 == m { f = 1 } END { exit !f }' /proc/1/mountinfo 2>/dev/null; }
+zs_left=""
+for f in /dev/socket/zygote /dev/socket/usap_pool_primary; do
+    n=0
+    while [ $n -lt 5 ] && zs_bound "$f"; do
+        if [ -n "$BB" ]; then in_init_ns "$BB" umount -l "$f" 2>/dev/null; else in_init_ns umount -D -l "$f" 2>/dev/null; fi
+        n=$((n + 1))
+    done
+    if zs_bound "$f"; then zs_left="$zs_left $f"
+    elif [ $n -gt 0 ]; then echo "Took the guest zygote's bind off $f"; fi
+done
+if [ -n "$zs_left" ]; then
+    echo "!!! still bound:$zs_left (One UI's zygote could not make its sockets); rebooting"
+    ONEOS_RETURN_MODE=reboot
+fi
+
 # Put the host's own /data trees back FIRST: guest_prepare.sh bridges the
 # staged app trees (installd/artd write there), and nothing may start One UI
 # on top of the guest's copies.
@@ -477,6 +504,16 @@ done
 left=$("$BB" grep -H -F "/local/tmp/oneos/" /proc/[0-9]*/mountinfo 2>/dev/null |
     "$BB" awk -v s="$S/" -v r="/local/tmp/oneos/" 'index($5, s) == 1 || index($4, r) == 1 {print $1 " " $4 " " $5}' | "$BB" head -n 3)
 [ -z "$left" ] || failsafe "stage still mounted: $left"
+# Nor anything on One UI's own partitions that the session added (mount
+# points recorded by guest_prepare.sh before its setup, host_part_mounts). An
+# image with system/product as a link to /product put an overlay on One UI's
+# /product/etc (2026-10-25), whose source is no stage path.
+if [ -f "$S/host_part_mounts.before" ]; then
+    "$BB" awk '$5 ~ /^\/(system|system_ext|product|vendor|vendor_dlkm|odm|odm_dlkm|oem|prism|optics|my_[a-z_]+)(\/|$)/ {print $5}' /proc/1/mountinfo |
+        "$BB" sort > "$S/host_part_mounts.return"
+    extra=$("$BB" awk 'NR == FNR { b[$0] = 1; next } !($0 in b)' "$S/host_part_mounts.before" "$S/host_part_mounts.return" | "$BB" head -n 3)
+    [ -z "$extra" ] || failsafe "mounted over One UI's own partitions: $extra"
+fi
 # Private device nodes from sysfs maj:min for every loop and dm device the
 # return touches: guest_prepare.sh re-creates /dev/block/loop50-150 itself, so
 # a name there proves nothing.
@@ -525,13 +562,23 @@ for d in $("$BB" awk '$1 == "dev" {print $3} $1 == "loop" {print $2}' "$BASE/ape
     esac
 done
 # The kernel log since the switch, for errors on exactly these devices.
-devs=$("$BB" awk '$1 == "dev" {print $3; print $2} $1 == "loop" {print $2}' "$BASE/apex" | "$BB" sort -u | "$BB" tr '\n' '|')
+# Joined with "|" and no empty entry: a trailing "|" ("loop9|)") made busybox
+# grep -E fail with "empty (sub)expression", and the scan then found nothing
+# (S25 Ultra and Galaxy S23 returns, 0.4.17: "kernel log clean" unscanned).
+devs=$("$BB" awk '$1 == "dev" {print $3; print $2} $1 == "loop" {print $2}' "$BASE/apex" | "$BB" grep -v '^$' | "$BB" sort -u | "$BB" tr '\n' '|' | "$BB" sed 's/|*$//')
 mark=$(cat "$BASE/kmsg" 2>/dev/null)
 klog=$("$BB" dmesg 2>/dev/null | "$BB" awk -v m="$mark" 'm != "" && index($0, m) {f = 1; next} f || m == ""')
 "$BB" dmesg 2>/dev/null | "$BB" grep -qF "$mark" || say "kernel log: the switch's marker rotated out, scanning all of it"
-bad=$(echo "$klog" | "$BB" grep -E "(^|[[:space:](,])(${devs%|})([^0-9]|\$)" | "$BB" grep -iE 'error|corrupt|verity|capacity change' | "$BB" head -n 3)
-[ -z "$bad" ] || failsafe "kernel log: $bad"
-say "Gate A: $(grep -c '^mount ' "$BASE/apex") One UI APEX mounts as at the switch, loops serving, ${read_mb} MB read below the modules (O_DIRECT $DIRECT), kernel log clean"
+re="(^|[[:space:](,])($devs)([^0-9]|\$)"
+if [ -z "$devs" ] || ! echo | "$BB" grep -qE "$re|^$" 2>/dev/null; then
+    say "kernel log: not scanned (no device list, or busybox grep refused the pattern)"
+    kl="kernel log not scanned"
+else
+    kl="kernel log clean"
+    bad=$(echo "$klog" | "$BB" grep -E "$re" | "$BB" grep -iE 'error|corrupt|verity|capacity change' | "$BB" head -n 3)
+    [ -z "$bad" ] || failsafe "kernel log: $bad"
+fi
+say "Gate A: $(grep -c '^mount ' "$BASE/apex") One UI APEX mounts as at the switch, loops serving, ${read_mb} MB read below the modules (O_DIRECT $DIRECT), $kl"
 
 # Gate A, part 2: the servicemanager names One UI keeps (first dynamically
 # linked programs of the return). vold above all.
@@ -576,7 +623,8 @@ STAGE=$S /system/bin/sh $S/guest_props.sh restore-persist >> "$IPLOG" 2>&1 || fa
 # Every other difference to the switch's props, by name only (values can be
 # personal: SIM, operator), for the log.
 getprop > "$S/inplace_props.after"
-changed=$("$BB" awk -F'\\]: \\[' 'NR == FNR {b[$1] = $2; next} !($1 in b) || b[$1] != $2 {sub(/^\[/, "", $1); print $1}' "$BASE/props" "$S/inplace_props.after" |
+# Empty names not there at the switch are the guest's, blanked (guest_props.sh remove).
+changed=$("$BB" awk -F'\\]: \\[' 'NR == FNR {b[$1] = $2; next} ($1 in b) ? b[$1] != $2 : $2 != "]" {sub(/^\[/, "", $1); print $1}' "$BASE/props" "$S/inplace_props.after" |
     "$BB" grep -vE '^(init\.svc|init\.svc_debug_pid|ro\.boottime|persist\.|sys\.system_server|debug\.|log\.tag|vendor\.debug)' | "$BB" tr '\n' ' ')
 say "props: restored; other changes since the switch: ${changed:-none}"
 # SELinux back before any One UI process starts (was last, after zygote).
@@ -607,8 +655,28 @@ done < "$BASE/gc_urgent"
 # Display: the composer still holds the guest's dead surfaceflinger as its
 # client (guest_start.sh restarted it for the guest); its onrestart starts One
 # UI's surfaceflinger, which starts the boot animation.
-setprop ctl.restart vendor.qti.hardware.display.composer
-wait_found android.hardware.graphics.composer3.IComposer/default 10 || failsafe "the display composer did not come back"
+# Snapdragon's composer service, or Samsung's Exynos one (guest_start.sh).
+COMPOSER_SVC=""
+for c in vendor.qti.hardware.display.composer vendor.hwcomposer-3; do
+    [ -n "$(getprop init.svc.$c)" ] && { COMPOSER_SVC=$c; break; }
+done
+[ -n "$COMPOSER_SVC" ] || failsafe "no known display composer service"
+setprop ctl.restart "$COMPOSER_SVC"
+# The SM8550 phones (Galaxy S23) have only the HIDL composer
+# (android.hardware.graphics.composer@2.x): waiting for the AIDL one rebooted
+# every return there (1f4f0c7f). The vendor manifest says which one this phone
+# serves; lshal, bounded, for the HIDL one.
+if "$BB" grep -rqs 'android.hardware.graphics.composer3' /vendor/etc/vintf/; then
+    wait_found android.hardware.graphics.composer3.IComposer/default 10 || failsafe "the display composer did not come back"
+else
+    sleep 1  # past the old instance's registration
+    n=0
+    while [ $n -lt 20 ] && ! timeout 3 lshal list -i 2>/dev/null | "$BB" grep -q 'android\.hardware\.graphics\.composer@[0-9.]*::IComposer/default'; do
+        sleep 0.5; n=$((n + 1))
+    done
+    [ $n -lt 20 ] || failsafe "the display composer (HIDL) did not come back"
+    say "display: the HIDL composer is back after $((n / 2)) s"
+fi
 wait_found SurfaceFlinger 5 || setprop ctl.start surfaceflinger
 wait_found SurfaceFlinger 10 || failsafe "One UI's surfaceflinger did not start"
 setprop service.bootanim.exit 0
@@ -671,6 +739,11 @@ n=0
 while [ $n -lt 20 ] && [ "$(getprop init.svc.zygote)" != running ]; do sleep 0.5; n=$((n + 1)); done
 [ "$(getprop init.svc.zygote)" = running ] || setprop ctl.start zygote
 say "One UI's zygote started ($(getprop init.svc.zygote))"
+# One UI's 32-bit zygote (zygote64_32 phones), stopped by the switch.
+if [ "$(base_prop init.svc.zygote_secondary)" = running ] && [ "$(getprop init.svc.zygote_secondary)" != running ]; then
+    setprop ctl.start zygote_secondary
+    say "One UI's zygote_secondary started"
+fi
 
 # Gate C: system_server must come up and keep its pid until user 0 is
 # unlocked and 30 s more. Any death reboots right away: Samsung's bootchecker

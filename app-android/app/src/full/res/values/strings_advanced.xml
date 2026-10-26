@@ -105,7 +105,7 @@
     <string name="space_choose_use">Use this system again</string>
     <string name="space_choose_delete">Delete it</string>
     <string name="space_details_summary">Folder names, and what OneOS checks first</string>
-    <string name="space_details_rules">Root deletes only an old copy OneOS kept (a folder named oneos.old-&lt;time&gt;), and not while it\'s in use: something is still open in it, a session since the last restart used it, or it\'s still linked to One UI\'s folders. A restart ends that.</string>
+    <string name="space_details_rules">Root deletes only an old copy OneOS kept (a folder named oneos.old-&lt;time&gt;), and not while it\'s in use: something is still open in it, a session in it is still running or never came back, or it\'s still linked to One UI\'s folders. A restart ends that.</string>
     <string name="space_details_folder">%1$s · image %2$s</string>
 
     <!-- Last session -->

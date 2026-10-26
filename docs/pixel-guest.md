@@ -190,6 +190,17 @@ Causes and fixes (for run 43):
   corner and dot padding 8dp, end padding 4dp also at sw600dp. It goes in the
   guest's `/oem/overlay` when the guest has SystemUIGoogle.
   `ONEOS_GUEST_STATUSBAR_PADDING=0` leaves it out.
+- Status bar height (0.4.18, a Galaxy S26 Ultra user: the bar far taller than
+  the camera hole, higher than One UI's): the image's own device overlays in
+  product, above OneOS's in /oem, give the guest the Pixel's cutout and status
+  bar height. oneos_switch.sh saves One UI's cutout spec and status bar height
+  (`host_statusbar`, phones with one internal display) before One UI stops,
+  and the UI activator makes four fabricated overlays from them
+  (`com.android.shell:OneOSCutout`, `OneOSCutoutRect`, `OneOSStatusBarHeight`,
+  `OneOSStatusBarHeightPortrait`) and enables them. Fabricated overlays are
+  mutable, so enabled they come above every static one. The S26 Ultra's: a
+  21 x 37 dp cutout, status bar 30 dp. `ONEOS_GUEST_HOST_CUTOUT=0` leaves them
+  out. Untested on a phone.
 - Freezes: SurfaceFlinger dropped to 1 Hz at every window transition (9 times,
   1-2.4 s each). The app-request render range was [0, 120]; ColorOS kept
   [120, 120]. guest_start.sh now pins both ranges of each panel to [60, 120]
