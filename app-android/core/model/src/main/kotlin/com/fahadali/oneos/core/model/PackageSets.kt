@@ -256,7 +256,10 @@ object PackageSets {
         id = ID_X9U_IN_SULTRA,
         imageId = Images.ID_FIND_X9U_IN,
         sourceDir = "out/overlays_x9u_in_r51",
-        files = COMMON + PackageFile(CELLBROADCAST, FileRole.APEX_PAYLOAD),
+        files = COMMON + listOf(
+        PackageFile("oplus-framework.jar", FileRole.FRAMEWORK_JAR),
+        PackageFile(CELLBROADCAST, FileRole.APEX_PAYLOAD),
+    ),
         omitted = listOf(TETHERING, WALLPAPER_GRID_RRO),
         approxBytes = 327_686_370L,
         hasReturnApp = true,

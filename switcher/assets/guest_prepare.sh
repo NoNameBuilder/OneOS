@@ -580,15 +580,15 @@ if [ -f "$STAGE/oplus-framework.jar" ] && [ -e "$ROOTFS/system/framework/oplus-f
     $BB mount --bind "$STAGE/oplus-framework.jar" "$ROOTFS/system/framework/oplus-framework.jar"
     echo "Bound oplus-framework.jar -> $ROOTFS/system/framework/oplus-framework.jar"
 fi
-# OneOS live-patch: SystemUI (status bar padding: halve L/R +1.25x, fix bottom)
-# Staged from the app assets (x9u-in-sultra set) and bind-mounted over the guest's
-# SystemUI.apk before the guest zygote starts.
-if [ -f "$STAGE/SystemUI_patched.apk" ] && [ -e "$ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk" ]; then
-    $BB umount -l "$ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk" 2>/dev/null || true
-    $BB mount --bind "$STAGE/SystemUI_patched.apk" "$ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk"
-    echo "Bound SystemUI_patched.apk -> $ROOTFS/system/system_ext/priv-app/SystemUI/SystemUI.apk"
-fi
-# Play services and the Play Store from One UI's copy (oneos_switch.sh took it
+# Camera: host cameraserver already runs and shares binder namespace (oneos_switch.sh).
+# Guest app connects to it (logs confirm), but HAL open times out — likely SELinux
+# denial on /dev/video* for guest UID. Fix: relabel /dev/video* to allow guest uids.
+for v in /dev/video* /dev/v4l*; do
+    [ -e "$v" ] || continue
+    $BB chcon u:object_r:camera_device:s0 "$v" 2>/dev/null || true
+done
+# Also ensure camera HAL libs are accessible (they're in /vendor which is bound)
+echo "Camera: host cameraserver used; /dev/video* relabeled for guest access"
 # before One UI stopped), bound over the image's my_product slots, for every
 # ColorOS set (switcher/assets/guest_google.sh). Never stops the start: without
 # a checked copy the guest starts without it.

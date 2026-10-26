@@ -207,7 +207,7 @@ set_files() {
         n6-f8u) echo "$SET_COMMON OneOSWallpapersFoldGrid.apk" ;;
         n6-f8) echo "$SET_COMMON OneOSWallpapersFoldGrid.apk Fold8SystemUI.apk Fold8AngleRelay.dex Fold8Aod.apk Fold8UMS.apk Fold8Instant.apk" ;;
         x9u-sultra) echo "$SET_COMMON" ;;
-        x9u-in-sultra) echo "$SET_COMMON cellbroadcast_payload.img" ;;
+        x9u-in-sultra) echo "$SET_COMMON cellbroadcast_payload.img oplus-framework.jar" ;;
         pixel-f8u) echo "$SET_PIXEL" ;;
         pixel-sultra) echo "$SET_PIXEL" ;;
         *) return 1 ;;

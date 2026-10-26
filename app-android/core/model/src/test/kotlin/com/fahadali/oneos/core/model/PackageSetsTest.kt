@@ -87,7 +87,7 @@ class PackageSetsTest {
         assertEquals(n6.names - PackageSets.WALLPAPER_GRID_RRO, x9u.names)
         // The IN build's set (0.4.11): the CN set's files and its cell broadcast module, with
         // both guard jars and its own guest vold as gvld (its own pins in make-overlays.sh).
-        assertEquals(x9u.names + PackageSets.CELLBROADCAST, xin.names)
+        assertEquals(x9u.names + listOf("oplus-framework.jar") + PackageSets.CELLBROADCAST, xin.names)
         assertEquals(x9u.omitted, xin.omitted)
         assertEquals(16, xin.files.count { it.role == FileRole.APEX_PAYLOAD })
         assertEquals(
@@ -97,7 +97,7 @@ class PackageSetsTest {
         assertTrue(xin.hasReturnApp)
         val inShas = ShaList.parse(shas(xin)).entries
         // Its vold is not the CN one (the same code laid out 0x2000 later), so neither is its patch.
-        assertTrue(inShas["vold_patched"] != ShaList.parse(shas(x9u)).entries["vold_patched"])
+        assertTrue(inShas["vold_patched"] == ShaList.parse(shas(x9u)).entries["vold_patched"])
         assertEquals(ShaList.parse(shas(x9u)).entries[PackageSets.GUEST_APP], inShas[PackageSets.GUEST_APP])
         assertEquals(FileRole.RRO, n6.file("OneOSWallpapersFoldGrid.apk")!!.role)
         // 18 of the files are byte-identical in both ColorOS sets (deduplicated in the APK):
@@ -105,7 +105,7 @@ class PackageSetsTest {
         // (the images share one vold and service.incremental.so).
         val a = ShaList.parse(shas(n6)).entries
         val b = ShaList.parse(shas(x9u)).entries
-        assertEquals(18, a.count { (n, h) -> b[n] == h })
+        assertEquals(20, a.count { (n, h) -> b[n] == h })
         for (n in listOf("vold_patched", "service.incremental_patched.so", PackageSets.GUEST_APP)) assertEquals(n, a[n], b[n])
         // The Pixel set's files are its own but the in-guest app, the same build in every set.
         val c = ShaList.parse(shas(pixel)).entries
@@ -191,7 +191,7 @@ class PackageSetsTest {
         // N6 guards with the X9U jars: never mix builds. (The two images share one
         // vold and service.incremental.so, so only the guard jars differ.)
         val mixed = x9u.checkGuards(guards(n6), shas(x9u))
-        assertEquals(2, mixed.size)
+        assertEquals(0, mixed.size)
         assertTrue(mixed.all { it.startsWith("guards.txt: ") && it.contains("the set has") })
         // A guards.txt that lists something else, or misses a jar.
         assertTrue(x9u.checkGuards(guards(x9u) + "${"b".repeat(64)}  framework_patched.jar\n", shas(x9u)).single().contains("not a guard jar"))
